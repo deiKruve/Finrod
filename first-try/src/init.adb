@@ -16,6 +16,7 @@ package body Init is
   
   procedure Init_Pins
   is
+     Ahb1en_Tmp  : Rcc.AHB1EN_Register := R.Rcc.AHB1ENR;
      Apb1en_Tmp  : Rcc.APB1EN_Register := R.Rcc.APB1ENR;
      Moder_Tmp   : Stm.Bits_16x2       := R.GPIOD.MODER;
      Ospeedr_Tmp : Stm.Bits_16x2       := R.GPIOD.Ospeedr;
@@ -23,7 +24,10 @@ package body Init is
      Pupdr_Tmp   : Stm.Bits_16x2       := R.GPIOD.Pupdr;
      Afrh_Tmp    : Gpio.Afrh_Register  := R.GPIOD.Afrh;
   begin
-     
+     -- start some clocks.
+     Ahb1en_Tmp.Gpiod     := Rcc.Enable;  -- for uart3 pins
+     Ahb1en_Tmp.Dma1      := Rcc.Enable;  -- for uart3 dma
+     R.Rcc.AHB1ENR        := Ahb1en_Tmp;
      -- enable uart3
      Apb1en_Tmp.Uart3     := Rcc.Enable;
      R.Rcc.APB1ENR        := Apb1en_Tmp;

@@ -1,15 +1,16 @@
 
 with System;
 with Ada.Unchecked_Conversion;
-
 with STM32F4.O7xx.Registers;
+with STM32F4.o7xx.Dma;
 with STM32F4.o7xx.Usart;
-with STM32F4.Gpio;
+--with STM32F4.Gpio;
 
 package body Sermon is
-   package Arm  renames STM32F4;
+   package Stm  renames STM32F4;
    package R    renames STM32F4.O7xx.Registers;
    package Uart renames STM32F4.o7xx.Usart;
+   package Dma  renames STM32F4.o7xx.Dma;
    
    pragma Warnings (Off, "*may call Last_Chance_Handler");
    pragma Warnings (Off, "*(No_Exception_Propagation) in effect");
@@ -28,33 +29,47 @@ package body Sermon is
    -- calculate baudrate contants for over_8 = 0
    USART3_D             : constant Long_Float := 
      APB1_Clock / (16.0 * USART3_Baudrate);
-   USART3_Div_Mantissa  : constant Arm.Bits_12 := 
-     Arm.Bits_12 (Long_Float'Truncation (USART3_D));
-   USART3_Div_Fraction  : constant Arm.Bits_4  := 
-     Arm.Bits_4 (Long_Float'Rounding 
+   USART3_Div_Mantissa  : constant Stm.Bits_12 := 
+     Stm.Bits_12 (Long_Float'Truncation (USART3_D));
+   USART3_Div_Fraction  : constant Stm.Bits_4  := 
+     Stm.Bits_4 (Long_Float'Rounding 
 		((USART3_D - Long_Float (USART3_Div_Mantissa)) * 16.0));
    
    -- to hold raw DMA USART data
-   type Word_Buffer_Type is array (1 .. Buf_Size) of Arm.Word;
+   type Word_Buffer_Type is array (1 .. Buf_Size) of Stm.Word;
    DMA_Data     : Word_Buffer_Type           := (others => 0);
-
    
+   S3_Cr_Tmp : Dma.CR_Register;
+   Uart_Data : aliased String (1 .. 68);
    
    ---------------
    -- utilities --
    ---------------
    
-   function Word_To_Char is
-      new Ada.Unchecked_Conversion 
-     (Source => Arm.Word, Target => Character);
+   --  function Word_To_Char is
+   --     new Ada.Unchecked_Conversion 
+   --    (Source => Stm.Word, Target => Character);
 
-   function Char_To_Word is
-      new Ada.Unchecked_Conversion 
-     (Source => Character, Target => Arm.Word);
+   --  function Char_To_Word is
+   --     new Ada.Unchecked_Conversion 
+   --    (Source => Character, Target => Stm.Word);
 
-   function Addr_To_Word is
-      new Ada.Unchecked_Conversion 
-     (Source => System.Address, Target => Arm.Word);
+   --  function Addr_To_Word is
+   --     new Ada.Unchecked_Conversion 
+   --    (Source => System.Address, Target => Stm.Word);
+   
+   function To_CR_Bits is new 
+     Ada.Unchecked_Conversion (Source => STM32F4.Word,
+			       Target => Dma.CR_Register);
+   function To_LIFCR_Bits is new 
+     Ada.Unchecked_Conversion (Source => STM32F4.Word,
+			       Target => Dma.LIFCR_Register);
+   function To_HIFCR_Bits is new 
+     Ada.Unchecked_Conversion (Source => STM32F4.Word,
+			       Target => Dma.HIFCR_Register);
+   function To_Bits_32 is new
+     Ada.Unchecked_Conversion (Source => System.Address,
+			       Target => Stm.Bits_32);
    
    
    ---------------------
@@ -71,8 +86,9 @@ package body Sermon is
    -- Get_DMA_Word --
    ------------------
    
-   function Get_DMA_Word (Index : Positive) return Arm.Word 
+   function Get_DMA_Word (Index : Positive) return Stm.Word 
    is
+      
    begin
       if Index <= Buf_Size then
          return DMA_Data (Index);
@@ -82,52 +98,173 @@ package body Sermon is
    end Get_DMA_Word;
    
    
+   ----------------------------
+   -- send a string          --
+   -- not more than 64 chars --
+   ----------------------------
+   
+   procedure Send_String (S : String)
+   is
+      use type Stm.Bits_1;
+      S3_NDTR_Tmp : Dma.NDTR_Register;
+      K : Natural := S'Length;
+   begin
+      S3_Cr_Tmp.En       := Dma.Off;
+      R.Dma1.S3.Cr       := S3_Cr_Tmp; -- disable dma
+      
+      if K > 63 then K := 63;
+      elsif K = 0 then return;
+      end if;
+      for J in 1 .. K loop
+	Uart_Data (j) := S(S'First - 1 + K);
+      end loop;
+      Uart_Data (K + 1) := Ascii.Lf;
+      for J in K + 2 .. 64 loop
+	 Uart_Data (j) :=  Character'Val(0);
+      end loop;
+      
+      while R.Dma1.S3.Cr.En /= Dma.Off loop -- wait for done
+	 null;
+      end loop;
+      S3_NDTR_Tmp.Ndt := 64;
+      R.Dma1.S3.NDTR  := S3_NDTR_Tmp; -- try fixed records, 
+					 -- but perhaps this 
+			    -- might be changed at evey transmission
+      S3_Cr_Tmp.En    := Dma.Enable;
+      R.Dma1.S3.Cr    := S3_Cr_Tmp; -- enable dma
+   end Send_String;
+   
+   
+   ---------------------
+   -- Init Usart3 DMA --
+   -- for the xmitter --
+   ---------------------
+   
+   procedure Init_Usart3_Dma3
+   is
+      use type Stm.Bits_1;
+      S3_Cr_Tmp : Dma.CR_Register             := To_Cr_Bits (0);
+      LIFCR_Tmp : constant Dma.LIFCR_Register := To_LIFCR_Bits (0);
+      HIFCR_Tmp : constant Dma.HIFCR_Register := To_HIFCR_Bits (0);
+      Par_Tmp   : constant Dma.PAR_Register   := 
+	To_Bits_32 (R.Usart3.Dr'address);
+      M0ar_Tmp  : constant Dma.M0ar_Register  :=
+	To_Bits_32 (Uart_Data'Address);
+   begin
+      -- configure stream 3 for transmission
+      S3_Cr_Tmp       := To_Cr_Bits (0);
+      R.Dma1.S3.Cr    := S3_Cr_Tmp; -- disable stream1 and zero control bits
+      while R.Dma1.S3.Cr.En /= Dma.Off loop -- wait for done
+	 null;
+      end loop;
+      R.Dma1.LIFCR    := LIFCR_Tmp; -- reset all pending interrupts
+      R.Dma1.HIFCR    := HIFCR_Tmp;
+      
+      R.Dma1.S3.Par   := Par_Tmp;   -- peripheral data address
+      R.Dma1.S3.M0ar  := M0ar_Tmp;  --  string address
+      
+      --R.Dma1.S3.NDTR.Ndt := 0; --64; -- try fixed records, but perhaps this 
+			    -- might be changed at evey transmission
+      S3_Cr_Tmp.CHSEL    := Dma.Sel_Ch1;
+      S3_Cr_Tmp.MBURST   := Dma.Single;
+      S3_Cr_Tmp.PBURST   := Dma.Single;
+      S3_Cr_Tmp.Pl       := Dma.Low; -- low priority for transmission
+      S3_Cr_Tmp.MSIZE    := Dma.Byte;
+      S3_Cr_Tmp.Psize    := Dma.Byte; -- controls NDTR number i.e 64 bytes
+      S3_Cr_Tmp.Minc     := Dma.Post_Inc;
+      S3_Cr_Tmp.Pinc     := Dma.Off;
+      S3_Cr_Tmp.Dir      := Dma.Mem_To_Periph;
+      S3_Cr_Tmp.PFCTRL   := Dma.Dma_Contrld;
+      R.Dma1.S3.Cr       := S3_Cr_Tmp; -- Write all this
+   end Init_Usart3_Dma3;
+   
+   
+   ----------------------
+   -- Init Usart3 DMA  --
+   -- for the receiver --
+   ----------------------
+   
+   procedure Init_Usart3_Dma1
+   is
+      use type Stm.Bits_1;
+      S1_Cr_Tmp : Dma.CR_Register             := To_Cr_Bits (0);
+      LIFCR_Tmp : constant Dma.LIFCR_Register := To_LIFCR_Bits (0);
+      HIFCR_Tmp : constant Dma.HIFCR_Register := To_HIFCR_Bits (0);
+      Par_Tmp   : constant Dma.PAR_Register   := 
+	To_Bits_32 (R.Usart3.Dr'address);
+      M0ar_Tmp  : constant Dma.M0ar_Register  :=
+	To_Bits_32 (Uart_Data'Address);
+   begin
+      -- configure stream 3 for transmission
+      S1_Cr_Tmp       := To_Cr_Bits (0);
+      R.Dma1.S1.Cr    := S1_Cr_Tmp; -- disable stream1 and zero control bits
+      while R.Dma1.S1.Cr.En /= Dma.Off loop -- wait for done
+	 null;
+      end loop;
+      R.Dma1.LIFCR    := LIFCR_Tmp; -- reset all pending interrupts
+      R.Dma1.HIFCR    := HIFCR_Tmp;
+      
+      R.Dma1.S1.Par   := Par_Tmp;   -- peripheral data address
+      R.Dma1.S1.M0ar  := M0ar_Tmp;  --  string address
+      
+      --R.Dma1.S1.NDTR.Ndt := 0; --64; -- try fixed records, but perhaps this 
+			    -- might be changed at evey transmission
+      S1_Cr_Tmp.CHSEL    := Dma.Sel_Ch1;
+      S1_Cr_Tmp.MBURST   := Dma.Single;
+      S1_Cr_Tmp.PBURST   := Dma.Single;
+      S1_Cr_Tmp.Pl       := Dma.Low; -- low priority for transmission
+      S1_Cr_Tmp.MSIZE    := Dma.Byte;
+      S1_Cr_Tmp.Psize    := Dma.Byte; -- controls NDTR number i.e 64 bytes
+      S1_Cr_Tmp.Minc     := Dma.Post_Inc;
+      S1_Cr_Tmp.Pinc     := Dma.Off;
+      S1_Cr_Tmp.Dir      := Dma.Mem_To_Periph;
+      S1_Cr_Tmp.PFCTRL   := Dma.Dma_Contrld;
+      R.Dma1.S1.Cr       := S1_Cr_Tmp; -- Write all this
+   end Init_Usart3_Dma1;
+ 
+   
    -----------------
    -- Init_USART3 --
    -----------------
    
-   
    procedure Init_USART3 
    is
-      Brr_Tmp : Uart.BRR_Register;
+      Brr_Tmp : Uart.BRR_Register := R.Usart3.Brr;
       Cr1_Tmp : Uart.Cr1_Register := R.Usart3.Cr1; -- hopefully all 0
+      Cr2_Tmp : Uart.Cr2_Register := R.Usart3.Cr2;
+      Cr3_Tmp : Uart.Cr3_Register := R.Usart3.Cr3;
+      Sr_Tmp  : Uart.Sr_Register  := R.Usart3.Sr;
    begin
+      Cr1_Tmp.Ue   := Uart.Enable; -- uart enable
+      Cr1_Tmp.M    := Uart.D8_Bits; -- 8 databits
+      R.Usart3.Cr1 := Cr1_Tmp;
+      
+      Cr2_Tmp.STOP := Uart.S2_Bit; -- 2 stopbits
+      R.Usart3.Cr2 := Cr2_Tmp;
+      
+      Cr3_Tmp.Dmat  := Uart.Enable; -- transmitter DMA
+      Cr3_Tmp.Dmar  := Uart.Enable; -- receiver DMA
+      Cr3_Tmp.HDSEL := Uart.On; -- half duplex
+      Init_Usart3_Dma1;
+      R.Usart3.Cr3  := Cr3_Tmp;
+      -- check error interrupt story
+      
       Brr_Tmp.DIV_Mantissa := USART3_Div_Mantissa; -- baudrate register
-      Brr_Tmp.DIV_Fraction := USART3_Div_Fraction;
+      Brr_Tmp.DIV_Fraction := USART3_Div_Fraction; -- at 115200
       R.Usart3.Brr         := Brr_Tmp;
       
-      Cr1_Tmp.Ue   := Uart.Enable; -- uart enable
+      Init_Usart3_Dma3; -- for the xmitter side
+      
+      Sr_Tmp.Tc   := Uart.Off; -- clear transmitter complete in the uart
+      R.Usart3.Sr  := Sr_Tmp;
+      
       Cr1_Tmp.Te   := Uart.Enable; -- xmitter enable
       Cr1_Tmp.Re   := Uart.Enable; -- receiver enable.
-      -- and 1 Start bit, 8 Data bits, n Stop bit, no parity
-      -- no interrupts
       R.Usart3.Cr1 := Cr1_Tmp;
       
 	
    end Init_USART3;
-   
-   
-      -----------------
-      -- test        --
-      -----------------
-      procedure Test
-      is
-	 use type STM32F4.Word;
-	 type Bits_32x1 is array (0 .. 31) of STM32F4.Bits_1 with Pack, Size => 32;
-	 Arr : Bits_32x1 := (others => 0);
-	 function To_Bits is new 
-	   Ada.Unchecked_Conversion (Source => STM32F4.Word,
-				     Target => Bits_32x1);
-	 function To_Word is new
-	   Ada.Unchecked_Conversion (Source => Bits_32x1,
-				     Target => STM32F4.Word);
-      begin
-	 Arr (1 .. 2) := (1,0);--(1 => 1, 2 => 0);
-	 
-	  Arr := To_Bits(To_Word (Arr) or 8);
-	 null;
-      end Test;
-      
+         
    
    
    
