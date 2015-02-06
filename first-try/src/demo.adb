@@ -4,7 +4,7 @@ with Sermon;
 procedure Demo is
 begin
    
-   Sermon.Clear_DMA_Data;
+   Sermon.Init_Usart3;
    null;
    
 end Demo;

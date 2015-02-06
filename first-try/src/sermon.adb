@@ -37,9 +37,6 @@ package body Sermon is
      Stm.Bits_4 (Long_Float'Rounding 
 		((USART3_D - Long_Float (USART3_Div_Mantissa)) * 16.0));
    
-   -- to hold raw DMA USART data
-   type Word_Buffer_Type is array (1 .. Buf_Size) of Stm.Word;
-   DMA_Data     : Word_Buffer_Type           := (others => 0);
    
    S3_Cr_Tmp : Dma.CR_Register;
    Uart_Data_Tobe_Send : aliased String (1 .. 68);
@@ -78,26 +75,80 @@ package body Sermon is
    -- Clear_DMA_Data  --
    ---------------------
    
-   procedure Clear_DMA_Data is
-   begin
-      DMA_Data := (others => 0);
-   end Clear_DMA_Data;
+   --  procedure Clear_DMA_Data is
+   --  begin
+   --     DMA_Data := (others => 0);
+   --  end Clear_DMA_Data;
    
    
    ------------------
    -- Get_DMA_Word --
    ------------------
    
-   function Get_DMA_Word (Index : Positive) return Stm.Word 
-   is
+   --  function Get_DMA_Word (Index : Positive) return Stm.Word 
+   --  is
       
+   --  begin
+   --     if Index <= Buf_Size then
+   --        return DMA_Data (Index);
+   --     else
+   --        return DMA_Data (1); -- only if bad index is passed in
+   --     end if;
+   --  end Get_DMA_Word;
+   
+   
+   -----------------------
+   -- polling functions --
+   -----------------------
+   
+   function Receiver_Is_Full return Boolean with Inline
+   is
    begin
-      if Index <= Buf_Size then
-         return DMA_Data (Index);
+      
+      return False;
+   end Receiver_Is_Full;
+   
+   
+   function Transmitter_Is_Empty return Boolean with Inline
+   is
+      use type Stm.Bits_1;
+      Sr_Tmp  : Uart.Sr_Register  := R.Usart3.Sr;
+   begin
+      if  Sr_Tmp.Tc = Uart.Complete then
+	 return True;
       else
-         return DMA_Data (1); -- only if bad index is passed in
+	 return False;
       end if;
-   end Get_DMA_Word;
+   end Transmitter_Is_Empty;
+   
+   
+   function Uart_Error return Boolean with Inline
+   is
+      use type Stm.Bits_1;
+      Sr_Tmp  : Uart.Sr_Register  := R.Usart3.Sr;
+   begin
+      if  (Sr_Tmp.Ore or Sr_Tmp.Fe or Sr_Tmp.Nf) = Uart.Tripped then 
+	 return True;
+      else 
+	 return False;
+      end if;
+   end Uart_Error;
+   
+   
+   function Dma1_Error return Boolean with Inline     -- for the xmitter --
+   is                                                 -- and receiver
+      use type Stm.Bits_1;
+      LISR_Tmp : Dma.LISR_Register := R.Dma1.LISR;
+   begin
+      if (LISR_Tmp.TEIF3 or LISR_Tmp.DMEIF3) = Uart.Tripped then 
+	 return True;   -- dma1 stream3 errors
+      elsif (LISR_Tmp.TEIF1 or LISR_Tmp.DMEIF1) = Uart.Tripped then
+	 return True;   -- dma1 stream1 errors
+      else
+	 return False;
+      end if;
+   end Dma1_Error;
+   
    
    
    ----------------------------
@@ -141,48 +192,48 @@ package body Sermon is
    -- receiver interrupt handler --
    --------------------------------
    
-   protected Serial_Recd_Data is
-      pragma Interrupt_Priority;
+   --  protected Serial_Recd_Data is
+   --     pragma Interrupt_Priority;
       
-      R_String : String (1 .. 68);
+   --     R_String : String (1 .. 68);
       
-      function Get_String return String;
+   --     function Get_String return String;
       
-      function Get_Complete return Boolean;
+   --     function Get_Complete return Boolean;
       
-   private
-      --R_String : String (1 .. 68);
-      Complete : Boolean := False;
+   --  private
+   --     --R_String : String (1 .. 68);
+   --     Complete : Boolean := False;
       
-      procedure Interrupt_Handler;
-      pragma Attach_Handler
-         (Interrupt_Handler,
-          Ada.Interrupts.Names.Sys_Tick_Interrupt);--
-	    --DMA1_Stream1_Interrupt);
-   end Serial_Recd_Data;
+   --     procedure Interrupt_Handler;
+   --     pragma Attach_Handler
+   --        (Interrupt_Handler,
+   --         Ada.Interrupts.Names.Sys_Tick_Interrupt);--
+   --  	    --DMA1_Stream1_Interrupt);
+   --  end Serial_Recd_Data;
    
    
-   protected body Serial_Recd_Data is
+   --  protected body Serial_Recd_Data is
       
-      function Get_String return String
-      is
-      begin
-	 Complete := False;
-	 return R_String;
-      end Get_String;
+   --     function Get_String return String
+   --     is
+   --     begin
+   --  	 Complete := False;
+   --  	 return R_String;
+   --     end Get_String;
       
-      function Get_Complete return Boolean
-      is
-      begin
-	 return Complete;
-      end Get_Complete;
+   --     function Get_Complete return Boolean
+   --     is
+   --     begin
+   --  	 return Complete;
+   --     end Get_Complete;
       
-      procedure Interrupt_Handler is
-      begin
-	 null;
-      end Interrupt_Handler;
+   --     procedure Interrupt_Handler is
+   --     begin
+   --  	 null;
+   --     end Interrupt_Handler;
       
-   end Serial_Recd_Data;
+   --  end Serial_Recd_Data;
    
    
    ---------------------
@@ -243,7 +294,7 @@ package body Sermon is
       Par_Tmp   : constant Dma.PAR_Register   := 
 	To_Bits_32 (R.Usart3.Dr'address);
       M0ar_Tmp  : constant Dma.M0ar_Register  :=
-	To_Bits_32 (Serial_Recd_Data.R_String'Address);-----------
+	To_Bits_32 (Serial_Recd_Data'Address);-----------
    begin
       -- configure stream 1 for reception
       S1_Cr_Tmp       := To_Cr_Bits (0);

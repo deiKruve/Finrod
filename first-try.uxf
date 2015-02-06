@@ -18,14 +18,19 @@ poll uart rec'd frame
 poll uart xmit empty
 --
 --
-</panel_attributes>
+poll uart error
+--
+--
+poll dma1 error
+--
+--</panel_attributes>
     <additional_attributes/>
   </element>
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>670</x>
-      <y>570</y>
+      <x>800</x>
+      <y>700</y>
       <w>140</w>
       <h>160</h>
     </coordinates>
@@ -52,11 +57,11 @@ type=sender</panel_attributes>
     <coordinates>
       <x>730</x>
       <y>110</y>
-      <w>70</w>
-      <h>480</h>
+      <w>200</w>
+      <h>610</h>
     </coordinates>
     <panel_attributes>lt=&lt;&lt;.</panel_attributes>
-    <additional_attributes>50.0;460.0;50.0;10.0;10.0;10.0</additional_attributes>
+    <additional_attributes>180.0;590.0;180.0;10.0;10.0;10.0</additional_attributes>
   </element>
   <element>
     <id>UMLClass</id>
@@ -73,16 +78,22 @@ type=sender</panel_attributes>
     <id>UMLClass</id>
     <coordinates>
       <x>90</x>
-      <y>340</y>
+      <y>310</y>
       <w>190</w>
-      <h>160</h>
+      <h>250</h>
     </coordinates>
     <panel_attributes>u-xmitter
 --
+queues the messges
+and sends one on
+xmit mt signal
+
+
+
 
 
 --
-wait for xmit mt
+wait for xmitr empty
 
 --
 send it
@@ -93,12 +104,12 @@ or direct</panel_attributes>
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>450</x>
-      <y>340</y>
-      <w>100</w>
+      <x>470</x>
+      <y>470</y>
+      <w>130</w>
       <h>90</h>
     </coordinates>
-    <panel_attributes>uart r-handler
+    <panel_attributes>uart err-handler
 --</panel_attributes>
     <additional_attributes/>
   </element>
@@ -107,11 +118,11 @@ or direct</panel_attributes>
     <coordinates>
       <x>250</x>
       <y>370</y>
-      <w>210</w>
-      <h>30</h>
+      <w>230</w>
+      <h>70</h>
     </coordinates>
     <panel_attributes>lt=[&lt;]-[send answer]</panel_attributes>
-    <additional_attributes>190.0;10.0;50.0;10.0</additional_attributes>
+    <additional_attributes>210.0;50.0;170.0;50.0;170.0;10.0;50.0;10.0</additional_attributes>
   </element>
   <element>
     <id>UMLState</id>
@@ -130,21 +141,185 @@ type=sender</panel_attributes>
     <coordinates>
       <x>270</x>
       <y>140</y>
-      <w>490</w>
-      <h>320</h>
+      <w>530</w>
+      <h>340</h>
     </coordinates>
     <panel_attributes>lt=&lt;&lt;.</panel_attributes>
-    <additional_attributes>10.0;300.0;470.0;300.0;470.0;10.0</additional_attributes>
+    <additional_attributes>10.0;320.0;510.0;320.0;510.0;10.0;470.0;10.0</additional_attributes>
   </element>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>550</x>
+      <x>600</x>
       <y>380</y>
-      <w>240</w>
+      <w>320</w>
       <h>30</h>
     </coordinates>
     <panel_attributes>lt=[=]-[=]</panel_attributes>
-    <additional_attributes>220.0;10.0;10.0;10.0</additional_attributes>
+    <additional_attributes>300.0;10.0;10.0;10.0</additional_attributes>
+  </element>
+  <element>
+    <id>UMLState</id>
+    <coordinates>
+      <x>580</x>
+      <y>160</y>
+      <w>170</w>
+      <h>20</h>
+    </coordinates>
+    <panel_attributes>post uart err-handler
+type=sender</panel_attributes>
+    <additional_attributes/>
+  </element>
+  <element>
+    <id>UMLState</id>
+    <coordinates>
+      <x>580</x>
+      <y>190</y>
+      <w>170</w>
+      <h>20</h>
+    </coordinates>
+    <panel_attributes>post dma1 err-handler
+type=sender</panel_attributes>
+    <additional_attributes/>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>740</x>
+      <y>160</y>
+      <w>160</w>
+      <h>560</h>
+    </coordinates>
+    <panel_attributes>lt=&lt;&lt;.</panel_attributes>
+    <additional_attributes>140.0;540.0;140.0;10.0;10.0;10.0</additional_attributes>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>740</x>
+      <y>190</y>
+      <w>130</w>
+      <h>530</h>
+    </coordinates>
+    <panel_attributes>lt=&lt;&lt;.</panel_attributes>
+    <additional_attributes>110.0;510.0;110.0;10.0;10.0;10.0</additional_attributes>
+  </element>
+  <element>
+    <id>UMLClass</id>
+    <coordinates>
+      <x>470</x>
+      <y>360</y>
+      <w>130</w>
+      <h>90</h>
+    </coordinates>
+    <panel_attributes>uart r-handler
+--</panel_attributes>
+    <additional_attributes/>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>250</x>
+      <y>400</y>
+      <w>230</w>
+      <h>130</h>
+    </coordinates>
+    <panel_attributes>lt=[&lt;]-[send err-msg]</panel_attributes>
+    <additional_attributes>210.0;110.0;140.0;110.0;140.0;10.0;50.0;10.0</additional_attributes>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>600</x>
+      <y>490</y>
+      <w>290</w>
+      <h>30</h>
+    </coordinates>
+    <panel_attributes>lt=[=]-[=]</panel_attributes>
+    <additional_attributes>270.0;10.0;10.0;10.0</additional_attributes>
+  </element>
+  <element>
+    <id>UMLClass</id>
+    <coordinates>
+      <x>470</x>
+      <y>580</y>
+      <w>130</w>
+      <h>90</h>
+    </coordinates>
+    <panel_attributes>dma1 err-handler
+--</panel_attributes>
+    <additional_attributes/>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>600</x>
+      <y>600</y>
+      <w>260</w>
+      <h>30</h>
+    </coordinates>
+    <panel_attributes>lt=[=]-[=]</panel_attributes>
+    <additional_attributes>240.0;10.0;10.0;10.0</additional_attributes>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>250</x>
+      <y>430</y>
+      <w>230</w>
+      <h>210</h>
+    </coordinates>
+    <panel_attributes>lt=[&lt;]-[send err-msg]</panel_attributes>
+    <additional_attributes>210.0;190.0;120.0;190.0;120.0;10.0;50.0;10.0</additional_attributes>
+  </element>
+  <element>
+    <id>UMLDeployment</id>
+    <coordinates>
+      <x>80</x>
+      <y>30</y>
+      <w>250</w>
+      <h>70</h>
+    </coordinates>
+    <panel_attributes>V-24 communication 
+----------------------------
+c jdk 20150206</panel_attributes>
+    <additional_attributes/>
+  </element>
+  <element>
+    <id>UMLInterface</id>
+    <coordinates>
+      <x>10</x>
+      <y>190</y>
+      <w>100</w>
+      <h>120</h>
+    </coordinates>
+    <panel_attributes>Interface
+--
+msg to,
+msg from 
+other modls</panel_attributes>
+    <additional_attributes/>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>110</x>
+      <y>260</y>
+      <w>230</w>
+      <h>110</h>
+    </coordinates>
+    <panel_attributes>lt=[&gt;]-[any msg]</panel_attributes>
+    <additional_attributes>10.0;10.0;190.0;10.0;190.0;90.0</additional_attributes>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>100</x>
+      <y>240</y>
+      <w>380</w>
+      <h>180</h>
+    </coordinates>
+    <panel_attributes>lt=[&lt;]-[msg to]</panel_attributes>
+    <additional_attributes>360.0;160.0;330.0;160.0;330.0;90.0;270.0;90.0;270.0;10.0;30.0;10.0</additional_attributes>
   </element>
 </diagram>
