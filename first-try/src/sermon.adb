@@ -1,9 +1,11 @@
 
 with System;
 with Ada.Unchecked_Conversion;
+with Ada.Interrupts.Names;
 with STM32F4.O7xx.Registers;
 with STM32F4.o7xx.Dma;
 with STM32F4.o7xx.Usart;
+--with 
 --with STM32F4.Gpio;
 
 package body Sermon is
@@ -40,7 +42,7 @@ package body Sermon is
    DMA_Data     : Word_Buffer_Type           := (others => 0);
    
    S3_Cr_Tmp : Dma.CR_Register;
-   Uart_Data : aliased String (1 .. 68);
+   Uart_Data_Tobe_Send : aliased String (1 .. 68);
    
    ---------------
    -- utilities --
@@ -116,11 +118,11 @@ package body Sermon is
       elsif K = 0 then return;
       end if;
       for J in 1 .. K loop
-	Uart_Data (j) := S(S'First - 1 + K);
+	Uart_Data_Tobe_Send (j) := S(S'First - 1 + K);
       end loop;
-      Uart_Data (K + 1) := Ascii.Lf;
+      Uart_Data_Tobe_Send (K + 1) := Ascii.Lf;
       for J in K + 2 .. 64 loop
-	 Uart_Data (j) :=  Character'Val(0);
+	 Uart_Data_Tobe_Send (j) :=  Character'Val(0);
       end loop;
       
       while R.Dma1.S3.Cr.En /= Dma.Off loop -- wait for done
@@ -133,6 +135,54 @@ package body Sermon is
       S3_Cr_Tmp.En    := Dma.Enable;
       R.Dma1.S3.Cr    := S3_Cr_Tmp; -- enable dma
    end Send_String;
+   
+   
+   --------------------------------
+   -- receiver interrupt handler --
+   --------------------------------
+   
+   protected Serial_Recd_Data is
+      pragma Interrupt_Priority;
+      
+      R_String : String (1 .. 68);
+      
+      function Get_String return String;
+      
+      function Get_Complete return Boolean;
+      
+   private
+      --R_String : String (1 .. 68);
+      Complete : Boolean := False;
+      
+      procedure Interrupt_Handler;
+      pragma Attach_Handler
+         (Interrupt_Handler,
+          Ada.Interrupts.Names.Sys_Tick_Interrupt);--
+	    --DMA1_Stream1_Interrupt);
+   end Serial_Recd_Data;
+   
+   
+   protected body Serial_Recd_Data is
+      
+      function Get_String return String
+      is
+      begin
+	 Complete := False;
+	 return R_String;
+      end Get_String;
+      
+      function Get_Complete return Boolean
+      is
+      begin
+	 return Complete;
+      end Get_Complete;
+      
+      procedure Interrupt_Handler is
+      begin
+	 null;
+      end Interrupt_Handler;
+      
+   end Serial_Recd_Data;
    
    
    ---------------------
@@ -149,7 +199,7 @@ package body Sermon is
       Par_Tmp   : constant Dma.PAR_Register   := 
 	To_Bits_32 (R.Usart3.Dr'address);
       M0ar_Tmp  : constant Dma.M0ar_Register  :=
-	To_Bits_32 (Uart_Data'Address);
+	To_Bits_32 (Uart_Data_Tobe_Send'Address);
    begin
       -- configure stream 3 for transmission
       S3_Cr_Tmp       := To_Cr_Bits (0);
@@ -193,9 +243,9 @@ package body Sermon is
       Par_Tmp   : constant Dma.PAR_Register   := 
 	To_Bits_32 (R.Usart3.Dr'address);
       M0ar_Tmp  : constant Dma.M0ar_Register  :=
-	To_Bits_32 (Uart_Data'Address);
+	To_Bits_32 (Serial_Recd_Data.R_String'Address);-----------
    begin
-      -- configure stream 3 for transmission
+      -- configure stream 1 for reception
       S1_Cr_Tmp       := To_Cr_Bits (0);
       R.Dma1.S1.Cr    := S1_Cr_Tmp; -- disable stream1 and zero control bits
       while R.Dma1.S1.Cr.En /= Dma.Off loop -- wait for done
@@ -207,19 +257,20 @@ package body Sermon is
       R.Dma1.S1.Par   := Par_Tmp;   -- peripheral data address
       R.Dma1.S1.M0ar  := M0ar_Tmp;  --  string address
       
-      --R.Dma1.S1.NDTR.Ndt := 0; --64; -- try fixed records, but perhaps this 
-			    -- might be changed at evey transmission
+      R.Dma1.S1.NDTR.Ndt := 64; --64; -- try fixed records
       S1_Cr_Tmp.CHSEL    := Dma.Sel_Ch1;
       S1_Cr_Tmp.MBURST   := Dma.Single;
       S1_Cr_Tmp.PBURST   := Dma.Single;
-      S1_Cr_Tmp.Pl       := Dma.Low; -- low priority for transmission
+      S1_Cr_Tmp.Pl       := Dma.high; -- high priority for reception
       S1_Cr_Tmp.MSIZE    := Dma.Byte;
       S1_Cr_Tmp.Psize    := Dma.Byte; -- controls NDTR number i.e 64 bytes
       S1_Cr_Tmp.Minc     := Dma.Post_Inc;
       S1_Cr_Tmp.Pinc     := Dma.Off;
-      S1_Cr_Tmp.Dir      := Dma.Mem_To_Periph;
+      S1_Cr_Tmp.Dir      := Dma.Periph_To_Mem;
       S1_Cr_Tmp.PFCTRL   := Dma.Dma_Contrld;
       R.Dma1.S1.Cr       := S1_Cr_Tmp; -- Write all this
+      S1_Cr_Tmp.En    := Dma.Enable;
+      R.Dma1.S1.Cr    := S1_Cr_Tmp; -- enable dma
    end Init_Usart3_Dma1;
  
    
@@ -254,6 +305,7 @@ package body Sermon is
       R.Usart3.Brr         := Brr_Tmp;
       
       Init_Usart3_Dma3; -- for the xmitter side
+      Init_Usart3_Dma1; -- for the receiver side
       
       Sr_Tmp.Tc   := Uart.Off; -- clear transmitter complete in the uart
       R.Usart3.Sr  := Sr_Tmp;
