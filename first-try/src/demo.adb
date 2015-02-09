@@ -1,4 +1,8 @@
 
+pragma Restrictions (Max_tasks => 0);
+pragma Warnings (Off, "*may call Last_Chance_Handler");
+pragma Warnings (Off, "*(No_Exception_Propagation) in effect");
+
 with Init;
 with Sermon;
 
@@ -8,8 +12,8 @@ is
    N        : Integer range -1 .. 10;
 begin
    
-   Sermon.Init_Usart3;
-   null;
+   Init.Init_Pins;
+
    loop
       if Sermon.Uart_Error then
 	 null;

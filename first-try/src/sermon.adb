@@ -1,7 +1,6 @@
 
 with System;
 with Ada.Unchecked_Conversion;
-with Ada.Interrupts.Names;
 with STM32F4.O7xx.Registers;
 with STM32F4.o7xx.Dma;
 with STM32F4.o7xx.Usart;
@@ -16,8 +15,8 @@ package body Sermon is
    
    pragma Warnings (Off, "*may call Last_Chance_Handler");
    pragma Warnings (Off, "*(No_Exception_Propagation) in effect");
-   pragma Warnings (Off,
-                    "*types for unchecked conversion have different sizes");
+   --  pragma Warnings (Off,
+   --                   "*types for unchecked conversion have different sizes");
    
    --------------------------------
    -- constants,                 --
@@ -150,7 +149,7 @@ package body Sermon is
    function Transmitter_Is_Empty return Boolean
    is
       use type Stm.Bits_1;
-      Sr_Tmp  : Uart.Sr_Register  := R.Usart3.Sr;
+      Sr_Tmp  : constant Uart.Sr_Register  := R.Usart3.Sr;
    begin
       if  Sr_Tmp.Tc = Uart.Complete then
 	 return True;
@@ -163,7 +162,7 @@ package body Sermon is
    function Uart_Error return Boolean
    is
       use type Stm.Bits_1;
-      Sr_Tmp  : Uart.Sr_Register  := R.Usart3.Sr;
+      Sr_Tmp  : constant Uart.Sr_Register  := R.Usart3.Sr;
    begin
       if  (Sr_Tmp.Ore or Sr_Tmp.Fe or Sr_Tmp.Nf) = Uart.Tripped then 
 	 return True;
@@ -176,7 +175,7 @@ package body Sermon is
    function Dma1_Error return Boolean     -- for the xmitter --
    is                                                 -- and receiver
       use type Stm.Bits_1;
-      LISR_Tmp : Dma.LISR_Register := R.Dma1.LISR;
+      LISR_Tmp : constant Dma.LISR_Register := R.Dma1.LISR;
    begin
       if (LISR_Tmp.TEIF3 or LISR_Tmp.DMEIF3) = Uart.Tripped then 
 	 return True;   -- dma1 stream3 errors
