@@ -4,8 +4,6 @@ with Ada.Unchecked_Conversion;
 with STM32F4.O7xx.Registers;
 with STM32F4.o7xx.Dma;
 with STM32F4.o7xx.Usart;
---with 
---with STM32F4.Gpio;
 
 package body Sermon is
    package Stm  renames STM32F4;
@@ -114,29 +112,34 @@ package body Sermon is
       while (Srr_Buf_Lastread - Srr_Buf_Newest < 0) or
 	(Srr_Buf_Lastread - Srr_Buf_Newest > 0) loop
 	 if not Receiver_Error then
+	    
 	    -- copy 1 byte and inc data-out index
 	    Serial_Recd_Data (Srd_Index) := 
 	      Serial_Recd_Ring_Buffer (Srr_idx);	    
 	    Srd_Index        := Srd_Index + 1;
+	    
 	    -- check for end of line
 	    if Serial_Recd_Ring_Buffer (Srr_idx) = Srd_Terminator then
 	       return True;
+	       
 	       -- check for outstring overrun
 	    elsif Srd_Index = Message_Length then
 	       -- input line too long or mostlikely ERROR
 	       -- so we must rebase
 	       Receiver_Error := True;
 	    end if;
+	    
 	 else -- there is a Receiver_Error
+	    
 	    -- check if the end of the faulty line is reached
 	    if Serial_Recd_Ring_Buffer (Srr_idx) = Srd_Terminator then
-	       -- rebase Serial_Recd_Data
+	       -- then rebase Serial_Recd_Data
 	       Receiver_Error := False;
 	       Srd_Index      := 1;
 	    end if;
 	 end if;
 	 
-	 -- increase the 'last read' index
+	 -- finally increase the 'last read' index
 	 Srr_Buf_Lastread := Srr_idx;
 	 -- between 1 and 256 here but starts at 0 .. 255 at 'begin'
 	 Srr_Idx := Srr_Idx mod Srr_Buf_Size + 1;
@@ -212,8 +215,10 @@ package body Sermon is
       S3_NDTR_Tmp.Ndt := Stm32f4.Bits_16 (K);
       
       -- wait for done disabling dma
-      while R.Dma1.S3.Cr.En /= Dma.Off loop 
-	 null;
+      declare
+	 S3_Cr_Tmp : Dma.CR_Register := R.Dma1.S3.Cr;
+      while S3_Cr_Tmp.En /= Dma.Off loop 
+	 S3_Cr_Tmp := R.Dma1.S3.Cr;
       end loop;
       
       -- set the length to be transmitted
@@ -291,9 +296,13 @@ package body Sermon is
       -- configure stream 3 for transmission
       S3_Cr_Tmp       := To_Cr_Bits (0);
       R.Dma1.S3.Cr    := S3_Cr_Tmp; -- disable stream1 and zero control bits
-      while R.Dma1.S3.Cr.En /= Dma.Off loop -- wait for done
-	 null;
-      end loop;
+      declare 
+	 S3_Cr_Tmp : Dma.CR_Register := R.Dma1.S3.Cr;
+      begin
+	 while S3_Cr_Tmp.En /= Dma.Off loop -- wait for done
+	    S3_Cr_Tmp := R.Dma1.S3.Cr;
+	 end loop;
+      end;
       R.Dma1.LIFCR    := LIFCR_Tmp; -- reset all pending interrupts
       R.Dma1.HIFCR    := HIFCR_Tmp;
       
@@ -335,11 +344,15 @@ package body Sermon is
       Ndtr_Tmp  : Dma.Ndtr_Register;
    begin
       -- configure stream 1 for reception
-      S1_Cr_Tmp       := To_Cr_Bits (0);
+      --S1_Cr_Tmp       := To_Cr_Bits (0);
       R.Dma1.S1.Cr    := S1_Cr_Tmp; -- disable stream1 and zero control bits
-      while R.Dma1.S1.Cr.En /= Dma.Off loop -- wait for done
-	 null;
-      end loop;
+      declare 
+	 S1_Cr_Tmp : Dma.CR_Register := R.Dma1.S1.Cr;
+      begin
+	 while S1_Cr_Tmp.En /= Dma.Off loop -- wait for done
+	    S1_Cr_Tmp := R.Dma1.S1.Cr;
+	 end loop;
+      end;
       R.Dma1.LIFCR       := LIFCR_Tmp; -- reset all pending interrupts
       R.Dma1.HIFCR       := HIFCR_Tmp;
       
