@@ -1,46 +1,51 @@
+------------------------------------------------------------------------------
+--                                                                          --
+--                             GNAT EXAMPLE                                 --
+--                                                                          --
+--             Copyright (C) 2014, Free Software Foundation, Inc.           --
+--                                                                          --
+-- GNAT is free software;  you can  redistribute it  and/or modify it under --
+-- terms of the  GNU General Public License as published  by the Free Soft- --
+-- ware  Foundation;  either version 3,  or (at your option) any later ver- --
+-- sion.  GNAT is distributed in the hope that it will be useful, but WITH- --
+-- OUT ANY WARRANTY;  without even the  implied warranty of MERCHANTABILITY --
+-- or FITNESS FOR A PARTICULAR PURPOSE.                                     --
+--                                                                          --
+--                                                                          --
+--                                                                          --
+--                                                                          --
+--                                                                          --
+-- You should have received a copy of the GNU General Public License and    --
+-- a copy of the GCC Runtime Library Exception along with this program;     --
+-- see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see    --
+-- <http://www.gnu.org/licenses/>.                                          --
+--                                                                          --
+-- GNAT was originally developed  by the GNAT team at  New York University. --
+-- Extensive contributions were provided by Ada Core Technologies Inc.      --
+--                                                                          --
+------------------------------------------------------------------------------
 
-pragma Restrictions (Max_tasks => 0);
-pragma Warnings (Off, "*may call Last_Chance_Handler");
-pragma Warnings (Off, "*(No_Exception_Propagation) in effect");
+--  The file declares the main procedure for the demonstration.
 
-with Init;
-with Sermon;
+--pragma Restrictions (Max_tasks => 1);
 
-procedure Demo 
-is
-   First, M : Sermon.Srd_Index_Type;
-   N        : Integer range -1 .. 10;
+with Mainloop;               pragma Unreferenced (Mainloop);
+--  The Driver package contains the task that actually controls the app so
+--  although it is not referenced directly in the main procedure, we need it
+--  in the closure of the context clauses so that it will be included in the
+--  executable.
+
+with Last_Chance_Handler;  pragma Unreferenced (Last_Chance_Handler);
+--  The "last chance handler" is the user-defined routine that is called when
+--  an exception is propagated. We need it in the executable, therefore it
+--  must be somewhere in the closure of the context clauses.
+
+with System;
+
+procedure Demo is
+   pragma Priority (System.Priority'First);
 begin
-   
-   Init.Init_Pins;
-
    loop
-      if Sermon.Uart_Error then
-	 null;
-      end if;
-      if Sermon.Dma1_Error then
-	 null;
-      end if;
-      if Sermon.Receiver_Is_Full then
-	 -- echo the string, but wait for transmitter empty
-	 if Sermon.Transmitter_Is_Empty then
-	    First := Sermon.Serial_Recd_Data_A.all'First;
-	    M     := First + Sermon.Srd_Terminator_Index;
-	    Sermon.Send_String 
-	      (String (Sermon.Serial_Recd_Data_A.all (First .. M - 1)));
-	    -- and rebase the 'Serial_Recd_Data' string, should not be needed
-	    --  but this -is- very important in the whole scheme of things
-	    N := Sermon.Srd_Index - Sermon.Srd_Terminator_Index - 1;
-	    if N >= 0 then
-	       Sermon.Serial_Recd_Data_A.all (First .. First + N) :=
-		 Sermon.Serial_Recd_Data_A.all (M .. M + N);
-	    end if;
-	    -- we have parsed the string, so set it to empty now
-	    Sermon.Srd_Index := First + N + 1;
-	 end if;
-	 null;
-      end if;
+      null;
    end loop;
-   
-   
 end Demo;
