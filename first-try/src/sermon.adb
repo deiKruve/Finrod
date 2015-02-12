@@ -287,7 +287,7 @@ package body Sermon is
    -- for the xmitter --
    ---------------------
    
-   procedure Init_Usart3_Dma3
+   procedure Init_Usart1_Dma7
    is
       use type Stm.Bits_1;
       LIFCR_Tmp : constant Dma.LIFCR_Register := To_LIFCR_Bits (0);
@@ -327,7 +327,7 @@ package body Sermon is
       
       -- S7_Cr_Tmp is global hence its data stays intact 
       -- for the data send routine where the dma is enabled
-   end Init_Usart3_Dma3;
+   end Init_Usart1_Dma7;
    
    
    ----------------------
@@ -335,7 +335,7 @@ package body Sermon is
    -- for the receiver --
    ----------------------
    
-   procedure Init_Usart3_Dma1
+   procedure Init_Usart1_Dma2
    is
       use type Stm.Bits_1;
       S2_Cr_Tmp : Dma.CR_Register             := To_Cr_Bits (0);
@@ -380,7 +380,7 @@ package body Sermon is
       
       S2_Cr_Tmp.En       := Dma.Enable;
       R.Dma2.S2.Cr       := S2_Cr_Tmp; -- enable dma
-   end Init_Usart3_Dma1;
+   end Init_Usart1_Dma2;
  
    
    -----------------
@@ -412,8 +412,8 @@ package body Sermon is
       Brr_Tmp.DIV_Fraction := USART1_Div_Fraction; -- at 115200
       --R.Usart1.Brr         := Brr_Tmp;
       
-      Init_Usart1_Dma3; -- for the xmitter side
-      Init_Usart1_Dma1; -- for the receiver side
+      Init_Usart1_Dma7; -- for the xmitter side
+      Init_Usart1_Dma2; -- for the receiver side
       
       Sr_Tmp.Tc    := Uart.Off; -- clear transmitter complete in the uart
       R.Usart1.Sr  := Sr_Tmp;

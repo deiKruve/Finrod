@@ -21,7 +21,7 @@ package body Mainloop is
 	 if Sermon.Uart_Error then
 	    null;
 	 end if;
-	 if Sermon.Dma1_Error then
+	 if Sermon.Dma2_Error then-----------------------------------discover
 	    null;
 	 end if;
 	 if Sermon.Receiver_Is_Full then

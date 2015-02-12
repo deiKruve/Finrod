@@ -49,7 +49,7 @@ package body Init is
      R.GPIOD.Afrh          := dAfrh_Tmp;
      
      -- init the usart and its dma:
-     Sermon.Init_Usart3;
+     --Sermon.Init_Usart3;--------------------------------------------
   end Init_Pins_Olimex;
   
   -- inits the pins and then calls any other init functions --
@@ -57,12 +57,12 @@ package body Init is
   procedure Init_Pins
   is
      Ahb1en_Tmp   : Rcc.AHB1EN_Register := R.Rcc.AHB1ENR;
-     Apb2en_Tmp   : Rcc.APB1EN_Register := R.Rcc.APB2ENR;
+     Apb2en_Tmp   : Rcc.APB2EN_Register := R.Rcc.APB2ENR;
      dModer_Tmp   : Stm.Bits_16x2       := R.GPIOB.MODER;
      dOspeedr_Tmp : Stm.Bits_16x2       := R.GPIOB.Ospeedr;
      dOtyper_Tmp  : Stm.Bits_16x1       := R.GPIOB.Otyper;
      dPupdr_Tmp   : Stm.Bits_16x2       := R.GPIOB.Pupdr;
-     dAfrh_Tmp    : Gpio.Afrh_Register  := R.GPIOB.Afrh;
+     dAfrl_Tmp    : Gpio.Afrl_Register  := R.GPIOB.Afrl;
   begin
      -- start some clocks.
      Ahb1en_Tmp.Gpiob     := Rcc.Enable;  -- for uart1 pins
@@ -70,7 +70,7 @@ package body Init is
      R.Rcc.AHB1ENR        := Ahb1en_Tmp;
      
      -- enable uart1
-     Apb1en_Tmp.Uart1     := Rcc.Enable;
+     Apb2en_Tmp.Uart1     := Rcc.Enable;
      R.Rcc.APB2ENR        := Apb2en_Tmp;
      
      -- set up uart1 pins to gpio.port B pins 6 and 7.
@@ -82,8 +82,8 @@ package body Init is
      R.GPIOB.Otyper        := dOtyper_Tmp;
      dPupdr_Tmp (6 .. 7)   := (others => Gpio.Pull_Up);
      R.GPIOB.Pupdr         := dPupdr_Tmp;
-     dAfrh_Tmp (6 .. 7)    := (others => Gpio.Af7);
-     R.GPIOB.Afrh          := dAfrh_Tmp;
+     dAfrl_Tmp (6 .. 7)    := (others => Gpio.Af7);
+     R.GPIOB.Afrl          := dAfrl_Tmp;
      
      -- init the usart and its dma:
      Sermon.Init_Usart1;

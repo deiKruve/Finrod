@@ -44,8 +44,8 @@ package Sermon is
    -- initialize the sermon --
    ---------------------------
    
-   procedure Init_USART1;
-   -- initializes uart1 and its dma structure
+   procedure Init_USART3;
+   -- initializes uart3 and its dma structure
    -- both for sending and receiving.
    -- Baudrate 115200.
    -- 8 databits, no parity, 2 stopbits, full duplex
@@ -65,7 +65,7 @@ package Sermon is
    -- did a uart error occur?
    -- no internal action is taken
    
-   function Dma2_Error return Boolean with Inline;
+   function Dma1_Error return Boolean with Inline;
    -- did a dma error occur?
    -- no internal action is taken
    
