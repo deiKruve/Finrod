@@ -16,7 +16,7 @@ package body Mainloop is
    begin
       
       Init.Init_Pins;
-
+      Sermon.Send_String ("Hallo I am up!");-----------------------
       loop
 	 if Sermon.Uart_Error then
 	    null;
