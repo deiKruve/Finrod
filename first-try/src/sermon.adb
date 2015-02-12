@@ -216,10 +216,12 @@ package body Sermon is
       
       -- wait for done disabling dma
       declare
-	 S3_Cr_Tmp : Dma.CR_Register := R.Dma1.S3.Cr;
-      while S3_Cr_Tmp.En /= Dma.Off loop 
-	 S3_Cr_Tmp := R.Dma1.S3.Cr;
-      end loop;
+         S3_Cr_Tmp : Dma.CR_Register := R.Dma1.S3.Cr;
+      begin
+         while S3_Cr_Tmp.En /= Dma.Off loop 
+            S3_Cr_Tmp := R.Dma1.S3.Cr;
+         end loop;
+      end;
       
       -- set the length to be transmitted
       R.Dma1.S3.NDTR  := S3_NDTR_Tmp;
