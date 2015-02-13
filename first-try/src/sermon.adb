@@ -57,19 +57,7 @@ package body Sermon is
    ---------------
    -- utilities --
    ---------------
-   
-   --  function Word_To_Char is
-   --     new Ada.Unchecked_Conversion 
-   --    (Source => Stm.Word, Target => Character);
-
-   --  function Char_To_Word is
-   --     new Ada.Unchecked_Conversion 
-   --    (Source => Character, Target => Stm.Word);
-
-   --  function Addr_To_Word is
-   --     new Ada.Unchecked_Conversion 
-   --    (Source => System.Address, Target => Stm.Word);
-   
+    
    function To_CR_Bits is new 
      Ada.Unchecked_Conversion (Source => STM32F4.Word,
 			       Target => Dma.CR_Register);
@@ -100,6 +88,7 @@ package body Sermon is
    -- 'Receiver Error' should get resolved as the function  --
    -- carries on reading characters from the uart stream    --
    -- one or more commandlines will be lost then            --
+   
    function Receiver_Is_Full return Boolean
    is
       use type stm32f4.Bits_16;
@@ -109,7 +98,6 @@ package body Sermon is
    begin
       Srr_Buf_Newest := Srr_Buf_Size - Srr_Buf_P_Type (Ndtr_Tmp.NDT);
       -- between 0 and 255  
-      -- 256 is a fluke but might occur?? its in another buscycle!
       -- 255 is written : 256 - 1 = 255
       -- 256 is written : 256 - 256 = 0
       -- 1 is written   : 256 - 255 = 1
@@ -117,15 +105,16 @@ package body Sermon is
 	(Srr_Buf_Lastread - Srr_Buf_Newest > 0) loop
 	 if not Receiver_Error then
 	    
-	    -- copy 1 byte and inc data-out index
-	    Serial_Recd_Data (Srd_Index) := 
-	      Serial_Recd_Ring_Buffer (Srr_idx);	    
-	    Srd_Index        := Srd_Index + 1;
-	    
+	    -- check for backspace
+	    if Serial_Recd_Ring_Buffer (Srr_idx) = Ascii.Bs then
+	       Srd_Index     := Srd_Index - 1;
+	       
 	    -- check for end of line
-	    if Serial_Recd_Ring_Buffer (Srr_idx) = Srd_Terminator then
-	       Srd_Terminator_Index := Srd_Index; 
-	       -- this now gives od 00 at the end----------------------
+	    elsif Serial_Recd_Ring_Buffer (Srr_idx) = Srd_Terminator then
+	       Srd_Terminator_Index := Srd_Index;   
+	       -- an increase the 'last read' index to point to 
+	       --  Srd_Terminator
+	       Srr_Buf_Lastread := Srr_Idx;
 	       return True;
 	       
 	       -- check for outstring overrun
@@ -133,6 +122,11 @@ package body Sermon is
 	       -- input line too long or mostlikely ERROR
 	       -- so we must rebase
 	       Receiver_Error := True;
+	       
+	    else -- copy 1 byte and inc data-out index
+	       Serial_Recd_Data (Srd_Index) := 
+		 Serial_Recd_Ring_Buffer (Srr_idx);	    
+	       Srd_Index        := Srd_Index + 1;
 	    end if;
 	    
 	 else -- there is a Receiver_Error
@@ -182,7 +176,7 @@ package body Sermon is
    
    
    function Dma2_Error return Boolean     -- for the xmitter --
-   is                                                 -- and receiver
+   is                                     -- and the receiver
       use type Stm.Bits_1;
       LISR_Tmp : constant Dma.LISR_Register := R.Dma2.LISR;
       HISR_Tmp : constant Dma.Hisr_Register := R.Dma2.HISR;
@@ -247,54 +241,6 @@ package body Sermon is
       S7_Cr_Tmp.En    := Dma.Enable;
       R.Dma2.S7.Cr    := S7_Cr_Tmp; 
    end Send_String;
-   
-   
-   --------------------------------
-   -- receiver interrupt handler --
-   --------------------------------
-   
-   --  protected Serial_Recd_Data is
-   --     pragma Interrupt_Priority;
-      
-   --     R_String : String (1 .. 68);
-      
-   --     function Get_String return String;
-      
-   --     function Get_Complete return Boolean;
-      
-   --  private
-   --     --R_String : String (1 .. 68);
-   --     Complete : Boolean := False;
-      
-   --     procedure Interrupt_Handler;
-   --     pragma Attach_Handler
-   --        (Interrupt_Handler,
-   --         Ada.Interrupts.Names.Sys_Tick_Interrupt);--
-   --  	    --DMA1_Stream1_Interrupt);
-   --  end Serial_Recd_Data;
-   
-   
-   --  protected body Serial_Recd_Data is
-      
-   --     function Get_String return String
-   --     is
-   --     begin
-   --  	 Complete := False;
-   --  	 return R_String;
-   --     end Get_String;
-      
-   --     function Get_Complete return Boolean
-   --     is
-   --     begin
-   --  	 return Complete;
-   --     end Get_Complete;
-      
-   --     procedure Interrupt_Handler is
-   --     begin
-   --  	 null;
-   --     end Interrupt_Handler;
-      
-   --  end Serial_Recd_Data;
    
    
    ---------------------
