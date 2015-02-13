@@ -51,6 +51,7 @@ package body Init is
      -- init the usart and its dma:
      --Sermon.Init_Usart3;--------------------------------------------
   end Init_Pins_Olimex;
+   pragma Unreferenced (Init_Pins_Olimex);
   
   -- inits the pins and then calls any other init functions --
   -- that might be needed                                   --

@@ -15,7 +15,7 @@ package Sermon is
 
    type Uart_Data_Type is new String (1 .. Message_Length);
    subtype Srd_Index_Type is Integer range 1 .. Message_Length;
-   type Uart_Data_Access_Type is access Uart_Data_Type;
+   type Uart_Data_Access_Type is access all Uart_Data_Type;
    
    Serial_Recd_Data_A : Uart_Data_Access_Type;
    -- incoming message buffer access
@@ -26,7 +26,7 @@ package Sermon is
    Srd_Terminator_Index : Srd_Index_Type := 1; 
    -- Last terminator Char + 1.
    
-   Srd_Terminator       : constant Character := ASCII.LF;
+   Srd_Terminator       : constant Character := ASCII.CR;
    -- terminating character of a incoming message
    
    
@@ -76,5 +76,5 @@ package Sermon is
    -- at the end.
    
 private
-   Serial_Recd_Data : Uart_Data_Type;
+   Serial_Recd_Data : aliased Uart_Data_Type;
 end Sermon;

@@ -24,6 +24,7 @@ package body Sermon is
    -- APB1_Clock (which USART 2,3,4,5,7,8 are on) is 42 MHz
    APB1_Clock           : constant Long_Float := 42_000_000.0;
    APB2_Clock           : constant Long_Float := 84_000_000.0;
+   pragma Unreferenced (APB2_Clock);
    -- APB2_Clock (usart1) on 84 MHz
    USART1_Baudrate      : constant Long_Float := 115200.0;
    
@@ -35,6 +36,7 @@ package body Sermon is
    USART1_Div_Fraction  : constant Stm.Bits_4  := 
      Stm.Bits_4 (Long_Float'Rounding 
 		((USART1_D - Long_Float (USART1_Div_Mantissa)) * 16.0));
+   pragma Unreferenced (USART1_Div_Fraction);
    
    -- this register must be global 
    S7_Cr_Tmp : Dma.CR_Register;
@@ -122,6 +124,8 @@ package body Sermon is
 	    
 	    -- check for end of line
 	    if Serial_Recd_Ring_Buffer (Srr_idx) = Srd_Terminator then
+	       Srd_Terminator_Index := Srd_Index; 
+	       -- this now gives od 00 at the end----------------------
 	       return True;
 	       
 	       -- check for outstring overrun
@@ -154,9 +158,9 @@ package body Sermon is
    function Transmitter_Is_Empty return Boolean
    is
       use type Stm.Bits_1;
-      Sr_Tmp  : constant Uart.Sr_Register  := R.Usart3.Sr;
+      Sr_Tmp  : constant Uart.Sr_Register  := R.Usart1.Sr;
    begin
-      if  Sr_Tmp.Tc = Uart.Complete then
+      if  Sr_Tmp.Txe = Uart.Dr_Mt then
 	 return True;
       else
 	 return False;
@@ -167,7 +171,7 @@ package body Sermon is
    function Uart_Error return Boolean
    is
       use type Stm.Bits_1;
-      Sr_Tmp  : constant Uart.Sr_Register  := R.Usart3.Sr;
+      Sr_Tmp  : constant Uart.Sr_Register  := R.Usart1.Sr;
    begin
       if  (Sr_Tmp.Ore or Sr_Tmp.Fe or Sr_Tmp.Nf) = Uart.Tripped then 
 	 return True;
@@ -181,11 +185,12 @@ package body Sermon is
    is                                                 -- and receiver
       use type Stm.Bits_1;
       LISR_Tmp : constant Dma.LISR_Register := R.Dma2.LISR;
+      HISR_Tmp : constant Dma.Hisr_Register := R.Dma2.HISR;
    begin
-      if (LISR_Tmp.TEIF3 or LISR_Tmp.DMEIF3) = Uart.Tripped then 
+      if (LISR_Tmp.TEIF2 or LISR_Tmp.DMEIF2) = Uart.Tripped then 
 	 return True;   -- dma2 stream3 errors
-      elsif (LISR_Tmp.TEIF1 or LISR_Tmp.DMEIF1) = Uart.Tripped then
-	 return True;   -- dma2 stream1 errors
+      elsif (HISR_Tmp.TEIF7 or HISR_Tmp.DMEIF7) = Uart.Tripped then
+	 return True;   -- dma2 stream7 errors
       else
 	 return False;
       end if;
@@ -201,8 +206,9 @@ package body Sermon is
    procedure Send_String (S : String)
    is
       use type Stm.Bits_1;
+      HIFCR_Tmp   : Dma.HIFCR_Register := To_HIFCR_Bits (0);
       S7_NDTR_Tmp : Dma.NDTR_Register;
-      K : Natural := S'Length;
+      K           : Natural := S'Length;
    begin
       -- disable dma
       S7_Cr_Tmp.En       := Dma.Off;
@@ -210,6 +216,8 @@ package body Sermon is
       
       -- copy string and terminate it
       Uart_Data_Tobe_Send (1 .. K) := S;
+      K := K + 1;
+      Uart_Data_Tobe_Send (K) := Ascii.Cr;
       K := K + 1;
       Uart_Data_Tobe_Send (K) := Ascii.Lf;
       
@@ -224,6 +232,13 @@ package body Sermon is
             S7_Cr_Tmp := R.Dma2.S7.Cr;
          end loop;
       end;
+      
+      -- reset any pending interrupts
+      HIFCR_Tmp.CFEIF7 := dma.Clearit; 
+      -- dont know why there should be a fifo error
+      HIFCR_Tmp.CHTIF7 := dma.Clearit; -- half done
+      HIFCR_Tmp.CTCIF7 := dma.Clearit; -- full done
+      R.Dma2.HIFCR     := HIFCR_Tmp;
       
       -- set the length to be transmitted
       R.Dma2.S7.NDTR  := S7_NDTR_Tmp;
@@ -283,7 +298,7 @@ package body Sermon is
    
    
    ---------------------
-   -- Init Usart3 DMA --
+   -- Init Usart1 DMA --
    -- for the xmitter --
    ---------------------
    
@@ -293,45 +308,52 @@ package body Sermon is
       LIFCR_Tmp : constant Dma.LIFCR_Register := To_LIFCR_Bits (0);
       HIFCR_Tmp : constant Dma.HIFCR_Register := To_HIFCR_Bits (0);
       Par_Tmp   : constant Dma.PAR_Register   := 
-	To_Bits_32 (R.Usart3.Dr'address);
+	To_Bits_32 (R.Usart1.Dr'address);
       M0ar_Tmp  : constant Dma.M0ar_Register  :=
 	To_Bits_32 (Uart_Data_Tobe_Send'Address);
    begin
-      -- configure stream 3 for transmission
-      S7_Cr_Tmp       := To_Cr_Bits (0);
-      R.Dma2.S7.Cr    := S7_Cr_Tmp; -- disable stream1 and zero control bits
+      -- configure stream 7 for transmission.
+      -- disable stream7 and zero control bits
+      S7_Cr_Tmp       := To_Cr_Bits (0); -- S7_Cr_Tmp is global
+      R.Dma2.S7.Cr    := S7_Cr_Tmp; 
+      
+      -- wait for done
       declare 
 	 S7_Cr_Tmp : Dma.CR_Register := R.Dma2.S7.Cr;
       begin
-	 while S7_Cr_Tmp.En /= Dma.Off loop -- wait for done
+	 while S7_Cr_Tmp.En /= Dma.Off loop
 	    S7_Cr_Tmp := R.Dma2.S7.Cr;
 	 end loop;
       end;
-      R.Dma2.LIFCR    := LIFCR_Tmp; -- reset all pending interrupts
+      
+      -- reset all pending interrupts
+      R.Dma2.LIFCR    := LIFCR_Tmp; 
       R.Dma2.HIFCR    := HIFCR_Tmp;
       
+      -- source and destination address
       R.Dma2.S7.Par   := Par_Tmp;   -- peripheral data address
       R.Dma2.S7.M0ar  := M0ar_Tmp;  --  string address
       
+      -- control register variabelen
       S7_Cr_Tmp.CHSEL    := Dma.Sel_Ch4;
       S7_Cr_Tmp.MBURST   := Dma.Single;
       S7_Cr_Tmp.PBURST   := Dma.Single;
       S7_Cr_Tmp.Pl       := Dma.Low; -- low priority for transmission
-      S7_Cr_Tmp.MSIZE    := Dma.Byte;
-      S7_Cr_Tmp.Psize    := Dma.Byte; -- controls NDTR number i.e 64 bytes
-      S7_Cr_Tmp.Minc     := Dma.Post_Inc;
+      S7_Cr_Tmp.MSIZE    := Dma.Byte; -- 8 bits at a time
+      S7_Cr_Tmp.Psize    := Dma.Byte; 
+      S7_Cr_Tmp.Minc     := Dma.Post_Inc; -- memory post inc
       S7_Cr_Tmp.Pinc     := Dma.Off;
       S7_Cr_Tmp.Dir      := Dma.Mem_To_Periph;
       S7_Cr_Tmp.PFCTRL   := Dma.Dma_Contrld;
       R.Dma2.S7.Cr       := S7_Cr_Tmp; -- Write all this
       
       -- S7_Cr_Tmp is global hence its data stays intact 
-      -- for the data send routine where the dma is enabled
+      --  for the data send routine where the dma is enabled.
    end Init_Usart1_Dma7;
    
    
    ----------------------
-   -- Init Usart3 DMA  --
+   -- Init Usart1 DMA  --
    -- for the receiver --
    ----------------------
    
@@ -342,54 +364,64 @@ package body Sermon is
       LIFCR_Tmp : constant Dma.LIFCR_Register := To_LIFCR_Bits (0);
       HIFCR_Tmp : constant Dma.HIFCR_Register := To_HIFCR_Bits (0);
       Par_Tmp   : constant Dma.PAR_Register   := 
-	To_Bits_32 (R.Usart3.Dr'address);
+	To_Bits_32 (R.Usart1.Dr'address);
       M0ar_Tmp  : constant Dma.M0ar_Register  := 
 	To_Bits_32 (Serial_Recd_Ring_Buffer'Address);
       Ndtr_Tmp  : Dma.Ndtr_Register;
    begin
-      -- configure stream 1 for reception
-      --S2_Cr_Tmp       := To_Cr_Bits (0);
-      R.Dma2.S2.Cr    := S2_Cr_Tmp; -- disable stream1 and zero control bits
+      -- configure stream 2 for reception
+      -- disable stream1 and zero control bits
+      R.Dma2.S2.Cr    := S2_Cr_Tmp; 
+      
+      -- wait for done
       declare 
 	 S2_Cr_Tmp : Dma.CR_Register := R.Dma2.S2.Cr;
       begin
-	 while S2_Cr_Tmp.En /= Dma.Off loop -- wait for done
+	 while S2_Cr_Tmp.En /= Dma.Off loop 
 	    S2_Cr_Tmp := R.Dma2.S2.Cr;
 	 end loop;
       end;
-      R.Dma2.LIFCR       := LIFCR_Tmp; -- reset all pending interrupts
+      
+      -- reset all pending interrupts
+      R.Dma2.LIFCR       := LIFCR_Tmp; 
       R.Dma2.HIFCR       := HIFCR_Tmp;
       
+      -- source and destination address
       R.Dma2.S2.Par      := Par_Tmp;   -- peripheral data address
       R.Dma2.S2.M0ar     := M0ar_Tmp;  --  string address
-      Ndtr_Tmp.Ndt       := Srr_Buf_Size; --  ring size
+      
+      --  set the receiver ring buffer size
+      Ndtr_Tmp.Ndt       := Srr_Buf_Size; 
       R.Dma2.S2.NDTR     := Ndtr_Tmp;     --  write ring size
       
+      -- control register variabelen
       S2_Cr_Tmp.CHSEL    := Dma.Sel_Ch4;
       S2_Cr_Tmp.MBURST   := Dma.Single;
       S2_Cr_Tmp.PBURST   := Dma.Single;
       S2_Cr_Tmp.Pl       := Dma.high; -- high priority for reception
-      S2_Cr_Tmp.MSIZE    := Dma.Byte;
-      S2_Cr_Tmp.Psize    := Dma.Byte; -- controls NDTR number i.e 64 bytes
-      S2_Cr_Tmp.Minc     := Dma.Post_Inc;
+      S2_Cr_Tmp.MSIZE    := Dma.Byte; -- 8 bits at a time
+      S2_Cr_Tmp.Psize    := Dma.Byte; 
+      S2_Cr_Tmp.Minc     := Dma.Post_Inc; -- memory post incement
       S2_Cr_Tmp.Pinc     := Dma.Off;
-      S2_Cr_Tmp.Circ     := Dma.Enable;
+      S2_Cr_Tmp.Circ     := Dma.Enable; -- circular buffer enable
       S2_Cr_Tmp.Dir      := Dma.Periph_To_Mem;
       S2_Cr_Tmp.PFCTRL   := Dma.Dma_Contrld;
-      R.Dma2.S2.Cr       := S2_Cr_Tmp; -- Write stream1 control register
+      R.Dma2.S2.Cr       := S2_Cr_Tmp; -- Write stream2 control register
       
+      -- enable dma
       S2_Cr_Tmp.En       := Dma.Enable;
-      R.Dma2.S2.Cr       := S2_Cr_Tmp; -- enable dma
+      R.Dma2.S2.Cr       := S2_Cr_Tmp; 
    end Init_Usart1_Dma2;
  
    
    -----------------
-   -- Init_USART3 --
+   -- Init_USART1 --
    -----------------
    
    procedure Init_USART1 
    is
       Brr_Tmp : Uart.BRR_Register := R.Usart1.Brr;
+      pragma Unreferenced (Brr_Tmp);
       Cr1_Tmp : Uart.Cr1_Register := R.Usart1.Cr1; -- hopefully all 0
       Cr2_Tmp : Uart.Cr2_Register := R.Usart1.Cr2;
       Cr3_Tmp : Uart.Cr3_Register := R.Usart1.Cr3;
@@ -408,8 +440,8 @@ package body Sermon is
       --Init_Usart1_Dma2; -- dont know why this was here
       R.Usart1.Cr3  := Cr3_Tmp;
       
-      Brr_Tmp.DIV_Mantissa := USART1_Div_Mantissa; -- baudrate register
-      Brr_Tmp.DIV_Fraction := USART1_Div_Fraction; -- at 115200
+      --Brr_Tmp.DIV_Mantissa := USART1_Div_Mantissa; -- baudrate register
+      --Brr_Tmp.DIV_Fraction := USART1_Div_Fraction; -- at 115200
       --R.Usart1.Brr         := Brr_Tmp;
       
       Init_Usart1_Dma7; -- for the xmitter side
@@ -423,7 +455,9 @@ package body Sermon is
       R.Usart1.Cr1 := Cr1_Tmp;
 
    end Init_USART1;
-         
+   
+begin
+   Serial_Recd_Data_A := Serial_Recd_Data'Access;
 end Sermon;
 
    

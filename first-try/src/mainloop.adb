@@ -28,7 +28,7 @@ package body Mainloop is
 	    -- echo the string, but wait for transmitter empty
 	    if Sermon.Transmitter_Is_Empty then
 	       First := Sermon.Serial_Recd_Data_A.all'First;
-	       M     := First + Sermon.Srd_Terminator_Index;
+	       M     := First + Sermon.Srd_Terminator_Index - 1;
 	       Sermon.Send_String 
 		 (String (Sermon.Serial_Recd_Data_A.all (First .. M - 1)));
 	       -- and rebase the 'Serial_Recd_Data' string, should not be needed
