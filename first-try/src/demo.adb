@@ -40,6 +40,9 @@ with Last_Chance_Handler;  pragma Unreferenced (Last_Chance_Handler);
 --  an exception is propagated. We need it in the executable, therefore it
 --  must be somewhere in the closure of the context clauses.
 
+with Timer;  pragma Unreferenced (Timer);
+-- until we have used it
+
 with System;
 
 procedure Demo is
