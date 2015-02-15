@@ -28,18 +28,25 @@ package body Mainloop is
 	 end if;
 	 if Sermon.Receiver_Is_Full then
 	    First := Sermon.Serial_Recd_Data_A.all'First;
+	    -- M now points to  the terminator
+	    M     := First + Sermon.Srd_Terminator_Index - 1;
 	    
 	    -- wait for transmitter empty
 	    while not Sermon.Transmitter_Is_Empty loop
 	       null;
 	    end loop;
 	    
-	    -- parse "rsttimer"
+	    -- since the terminator is not copied to 
+	    -- Sermon.Serial_Recd_Data_A.all, the last command
+	    -- will be repeated when you press the 'Enter' in a
+	    -- terminal window.
+	    
+	    -- try parse "rsttimer"
 	    if Sermon.Serial_Recd_Data_A.all (First .. First + 7) =
 	      "rsttimer" then
 	       Timer.Reset;
 	       
-	    -- parse "rtime"
+	    -- try parse "rtime"
 	    elsif Sermon.Serial_Recd_Data_A.all (First .. First + 4) = 
 	      "rtime" then
 	       Sermon.Send_String 
@@ -48,27 +55,27 @@ package body Mainloop is
 		    Timer.Time_Interval'Image (Timer.Report_Max_Duration) &
 		    " clock ticks.");
 	       
-	    -- echo the string
+	    -- else echo the string
 	    else
-	       --First := Sermon.Serial_Recd_Data_A.all'First;
-	       M     := First + Sermon.Srd_Terminator_Index - 1;
 	       Sermon.Send_String 
-		 (String (Sermon.Serial_Recd_Data_A.all (First .. M)));
-	       
-	       -- and rebase the 'Serial_Recd_Data' string, 
-	       -- should not be needed if we keep up with the uart,
-	       -- but this -is- very important in the whole scheme of things
-	       N := Sermon.Srd_Index - Sermon.Srd_Terminator_Index - 1;
-	       if N >= 0 then
-		  Sermon.Serial_Recd_Data_A.all (First .. First + N) :=
-		    Sermon.Serial_Recd_Data_A.all (M .. M + N);
-	       end if;
-	       
-	       -- we have parsed the string, so set it to empty now
-	       Sermon.Srd_Index := First + N + 1;
+		 (String (Sermon.Serial_Recd_Data_A.all (First .. M - 1)));
+
 	    end if;
-	    null;
+	    
+	    -- now rebase the 'Serial_Recd_Data' string, 
+	    -- should not be needed if we keep up with the uart,
+	    -- but this -is- very important in the whole scheme of things
+	    N := Sermon.Srd_Index - Sermon.Srd_Terminator_Index - 1;
+	    if N >= 0 then
+	       M := M + 1; -- first char after the terminator
+	       Sermon.Serial_Recd_Data_A.all (First .. First + N) :=
+		 Sermon.Serial_Recd_Data_A.all (M .. M + N);
+	    end if;
+	    
+	    -- we have parsed the string, so set it to empty now
+	    Sermon.Srd_Index := First + N + 1;
 	 end if;
+	 
 	 Timer.Stop_Timer;--------------------------testing
       end loop;     
    end tryit;
