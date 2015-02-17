@@ -1,3 +1,43 @@
+------------------------------------------------------------------------------
+--                                                                          --
+--                            FINROD COMPONENTS                             --
+--                                                                          --
+--                         F I N R O D . S E R M O N                        --
+--                                                                          --
+--                                 S p e c                                  --
+--                                                                          --
+--                     Copyright (C) 2015, Jan de Kruyf                     --
+--                                                                          --
+--                                                                          --
+-- This is free software;  you can redistribute it  and/or modify it  under --
+-- terms of the  GNU General Public License as published  by the Free Soft- --
+-- ware  Foundation;  either version 3,  or (at your option) any later ver- --
+-- sion.  This software is distributed in the hope  that it will be useful, --
+-- but WITHOUT ANY WARRANTY;  without even the implied warranty of MERCHAN- --
+-- TABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public --
+-- License for  more details.                                               --
+--                                                                          --
+-- You should have received a copy of the GNU General Public License and    --
+-- a copy of the GCC Runtime Library Exception along with this program;     --
+-- see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see    --
+-- <http://www.gnu.org/licenses/>.                                          --
+--                                                                          --
+--                Finrod  is maintained by J de Kruijf Engineers            --
+--                     (email: jan.de.kruyf@hotmail.com)                    --
+--                                                                          --
+------------------------------------------------------------------------------
+--
+-- a driver for uart1 for us by the diagnostic module
+--
+-- only procedure Init_USART1 ( for initializing in init_pins)
+-- and procedure Send_String (S : String) are for general use
+-- the rest of the interface is used in the sercom statemachine
+
+-- set minicom to 
+-- Baudrate 115200.
+-- 8 databits, no parity, 2 stopbits, full duplex.
+-- no handshaking, 3 wire connection.
+--
 
 with STM32F4;
 
