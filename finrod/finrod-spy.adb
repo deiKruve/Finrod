@@ -32,21 +32,31 @@
 -- It works as described in finrod-thread.ads
 --
 
+with System;
 with Finrod.Sermon;
 with Finrod.Thread;
+with Finrod.Timer;
+with Finrod.Last_Chance_Handler;
 
 package body Finrod.Spy is
-   package V24 renames Finrod.Sermon;
-   package Thr renames Finrod.Thread;
+   package V24  renames Finrod.Sermon;
+   package Thr  renames Finrod.Thread;
+   package Flch renames Finrod.Last_Chance_Handler;
+   package Timer renames Finrod.Timer;
    
    --------------------------------
    -- constants,                 --
    -- definitions and local vars --
    --------------------------------
+   Error_String : constant String:= "Finrod.Spy: Uart did not start";
+   Fsm_State             : State_Selector_Type := Idle;
+   Disappearance_Request : Boolean             := False;
+   Error_Counter         : Natural             := 0;
    
-   Fsm_State : State_Selector_Type := Idle;
    
-   
+   ----------------------------------------------------
+   -- finite state machine with persistant variables --
+   ----------------------------------------------------
    
    First, M : V24.Srd_Index_Type;
    N        : Integer range -1 .. 10;
@@ -58,12 +68,21 @@ package body Finrod.Spy is
       case Fsm_State is
 	 when Spy_Health_Check            =>
 	    if V24.Uart_Error then
-	       null;------------------------------------------------error--
+	       V24.Init_Usart1;
+	       Error_Counter := Error_Counter + 8;
 	       return;
 	    end if;
 	    if V24.Dma2_Error then--------------------------------discovery
-	       null;------------------------------------------------error--
+	       V24.Init_Usart1;
+	       Error_Counter := Error_Counter + 8;
 	       return;
+	    end if;
+	    if Error_Counter > 0 then
+	       if Error_Counter > 32 then
+		  Flch.Last_Chance_Handler (Error_String'Address, 79);
+	       else 
+		  Error_Counter := Error_Counter - 1;
+	       end if;
 	    end if;
 	    Fsm_State := Spy_Is_Receiver_Full;
 	    
@@ -116,24 +135,43 @@ package body Finrod.Spy is
 	    
 	    -- we have parsed the string, so set it to empty now
 	    V24.Srd_Index := First + N + 1;
-	    Fsm_State := Spy_Health_Check;
+	    if Disappearance_Request then
+	       Fsm_State := Idle;
+	    else
+	       Fsm_State := Spy_Health_Check;
+	    end if;
+	    
 	 when Idle                        =>
-	    null;
+	    Thr.Delete_Job (Fsm'Access); -- happens only once cause then fsm 
+					 -- does not get executed anymore
+	    Disappearance_Request := False;
       end case;
    end Fsm;
    
    
+   --------------------
+   -- public entries --
+   --------------------
+   
    procedure Insert_Spy
    is
    begin
-      null;
+      Fsm_State := Spy_Health_Check;
+      Thr.Insert_Job (Fsm'Access);
    end Insert_Spy;
    
    
    procedure Delete_Spy
    is
    begin
-      null;
+      Disappearance_Request := True;
    end Delete_Spy;
+   
+   
+   procedure Change_Spy_State ( St : State_Selector_Type)
+   is
+   begin
+      Fsm_State := St;
+   end Change_Spy_State;
 
 end Finrod.Spy;

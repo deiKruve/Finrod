@@ -34,7 +34,7 @@
 --
 
 with Finrod.Thread;
-with Finrod.App.Init;
+with Finrod.Board;
 
 package body Finrod.Nmt_Init is
    
@@ -59,7 +59,7 @@ package body Finrod.Nmt_Init is
 	    
 	    -- Initialize the basic board with comms, timer, etc
 	    -- insofar not done on the ada startup layer
-	    Finrod.App.Init.Init_Pins;
+	    Finrod.Board.Init_Pins;
 	    Fsm_State := Nmt_Gs_Reset_Application;
 	    
 	 when Nmt_Gs_Reset_Application   =>

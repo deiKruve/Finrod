@@ -42,6 +42,8 @@ package Finrod.Spy is
 				Spy_Echo_Junk,
 				Spy_Rebase_Incoming,
 				Idle);
+   -- possible states of the state machine
+   
 			       
    procedure Insert_Spy;
    -- initializes the Spy at Spy_Health_Check and
@@ -50,5 +52,9 @@ package Finrod.Spy is
    procedure Delete_Spy;
    -- synchronizes the Spy and takes it out of 
    -- the loop of things.
+   
+   procedure Change_Spy_State ( St : State_Selector_Type);
+   -- to get out of a knot
+   -- not very useful here
    
 end Finrod.Spy;
