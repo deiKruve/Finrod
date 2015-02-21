@@ -1,0 +1,264 @@
+AdaCore
+GNATtracker Access
+Contact Us
+Company
+Blog
+Products
+Developers
+Training
+Customers
+Ada Answers
+Academia
+Support
+Home / Ada Answers / Ada Gem of the Week / Gem #140: Bridging the Endianness Gap 
+Ada Answers
+Overview
+About Ada
+Benefits & Features
+Ada Gems
+Ada Resources
+Ada Lecture Series
+Videos
+
+All Gems »
+Filter by Products 
+GNAT Pro
+SPARK Pro
+GNATstack
+PolyORB
+Ada Web Server
+GtkAda
+
+Filter by Technologies 
+Ada
+Ada 2012
+Ada 2005 / 95 / 83
+Certification
+Distributed systems
+Embedded Development
+Formal Methods
+High Security Development
+IDE
+Libraries and Bindings
+Mixed Language
+Modeling
+Multi-Core
+Open Source
+Safety-Critical Development
+Static Analysis
+Testing
+Next
+Next
+Gem #140: Bridging the Endianness Gap
+
+Let's get started!
+
+ This Gem presents a new implementation-defined attribute introduced in the GNAT Ada tool suite that aims to facilitate the peaceful coexistence of big-endian and little-endian data applications. This is particularly important, for example, when retargeting an application from legacy hardware using a given endianness to another platform of different endianness. If any data was stored in memory or persistent storage by the legacy system, or if interoperability with other subsystems is to be preserved, it is necessary for all data structures to have precisely the same representation on the two platforms.
+
+ Consider the following two-byte data structure and record representation clause:
+   subtype Yr_Type is Natural range 0 .. 127;
+   subtype Mo_Type is Natural range 1 .. 12;
+   subtype Da_Type is Natural range 1 .. 31;
+
+   type Date is record
+      Years_Since_1980 : Yr_Type;
+      Month            : Mo_Type;
+      Day_Of_Month     : Da_Type;
+   end record;
+
+   for Date use record
+      Years_Since_1980 at 0 range 0  ..  6;
+      Month            at 0 range 7  .. 10;
+      Day_Of_Month     at 0 range 11 .. 15;
+   end record;
+
+
+ The representation of "December 12th, 2012" on a big-endian system is as follows:
+
+   0100000 1	 100 01100
+ yyyyyyy m	 mmm ddddd
+ 65	 140
+
+
+  
+
+ On a little-endian system the same date is represented as:
+
+   0 0100000	 01100 110
+ m yyyyyyy	 ddddd mmm
+ 32	 102
+
+
+  
+
+ One may believe that standard attribute Bit_Order will resolve this situation. Let's give it a try, and amend the declaration above with:
+for Date'Bit_Order use System.High_Order_First;
+
+ On a big-endian system this is the default, and we can verify that the representation is unchanged: the clause just restates the default explicitly (it is said to be confirming), and has no further effect.
+
+ On a little-endian system, however, the result isn't the expected one. To understand why, one needs to look at how the Ada standard defines the interpretation of record representation clauses.
+
+ When the bit order is the default bit order, growing bit offsets simply correspond to going into successive (growing) addresses in memory. But when the bit order is the opposite value, bits are numbered "backwards" with respect to the machine's way of storing data as successive bytes, so additional rules are required to know what bits we need to look at.
+
+ It is important to keep in mind that bit offsets for a component in a record representation clause are always relative to some integer value (called "machine scalars" in the Ada RM), from which the component value is extracted using a shift and a mask operation.
+
+ To find out which machine scalar a given component belongs to, you must first identify the set of components that share the same byte offset. In our example, this would be all three components, since all are specified with a byte offset of 0. Next, consider the highest bit offset for all of these components. Here, it's 15. The size of the machine scalar is then the next larger power of two: 16 in this example. So, this means that all three components in our record are part of a single machine scalar which is a two-byte integer of size 16 bits. If you are on a little-endian machine, the low-order byte of this machine scalar is always the one stored at the lower address, and the high-order byte is the one stored at the higher address. And it is essential to note that this is independent of the bit order specified for the data structure.
+
+ So, if you are on a little-endian system, and you specify a High_Order_First bit order, the two-byte machine scalar value will be:
+
+   0100000110001100
+ yyyyyyymmmmddddd
+
+
+  
+
+ which when stored as two successive bytes in memory will correspond to:
+
+   10001100	 01000001
+ 140	 65
+
+
+  
+
+ It is interesting to note that this differs from both the native little-endian representation and the native big-endian representation. That's because the order in which the bytes that constitute machine scalars are written to memory is not changed by the Bit_Order attribute -- only the indices of bits within machine scalars are changed.
+
+Now enter Scalar_Storage_Order
+
+ It is precisely in order to overcome this limitation of the language that a new attribute Scalar_Storage_Order was introduced in GNAT. The effect of this attribute is precisely to override the order of bytes in machine scalars for a given record type. So let's add another attribute definition:
+for Date'Scalar_Storage_Order use System.High_Order_First;
+
+ This means that the bytes constituting the machine scalars must be swapped when stored in memory. We see that the memory representation then becomes (65, 140): it is now consistent with the native representation on a big-endian platform.
+
+ Existing code for a big-endian system can thus be ported to a little-endian system without any fuss, and without any change of data representation, just by adding appropriate attribute definitions on relevant record type declarations.
+
+Compatibility with legacy toolchains
+
+ When retargeting an application with a change of endianness, it is convenient to use attribute Scalar_Storage_Order so that the new platform uses the same data representation as the old one. However, you might still want to be able to compile your application for your old target, with a legacy toolchain that might not support the newer attribute. In this case you can specify it using the alternate syntax:
+pragma Attribute_Definition
+   (Scalar_Storage_Order, Date, System.High_Order_First);
+
+ Older toolchains, which know nothing about the new attribute (or about the new implementation defined pragma Attribute_Definition), will simply ignore it, whereas newer compilers will treat this pragma as exactly equivalent to the corresponding attribute definition clause. The same application code can thus be compiled on both the legacy target with a legacy tool chain, and on the newer target (with different endianness) with a recent compiler, always using the same consistent data representation.
+
+Demo program
+
+ Note: two versions of the demo program are provided below. Both produce the same result with current GNAT Pro releases. However, GNAT GPL 2012 was branched early during development of this feature and has an issue with the syntax used in the first vresion of the demo program. For that compiler release, you therefore need to use the endianness_demo_gpl2012.adb version, which uses an alternative syntax and produces the expected result.
+
+ When run on a little-endian machine, the attached demo program outputs:
+Default bit order: LOW_ORDER_FIRST
+N      : 32 102
+LE_Bits: 32 102
+BE_Bits: 140 65
+LE:      32 102
+BE:      65 140
+
+  
+
+ On a big-endian machine, it shows:
+Default bit order: HIGH_ORDER_FIRST
+N      : 65 140
+LE_Bits: 102 32
+BE_Bits: 65 140
+LE:      32 102
+BE:      65 140
+
+  
+Attached Files
+endianness_demo.adb - (2 KB)
+endianness_demo_gpl2012.adb - (3 KB)
+
+Thomas Quinot
+AdaCore
+
+Thomas Quinot holds an engineering degree from Télécom Paris and a PhD from Université Paris VI. The main contribution of his research work is the definition of a flexible middleware architecture aiming at interoperability across distribution models. He joined AdaCore as a Senior Software Engineer in 2003, and is responsible for the distribution technologies. He also participates in the development, maintainance and support of the GNAT compiler.
+  
+  
+  
+  
+ShareThis 
+ 
+8 CommentsSimon Wright
+Jan 28th, 2013 	
+This may depend on the reader’s background - but I’ve never come across a bit/byte diagram for little-endian machines where the least significant byte is on the left! The way the first little-endian diagram has the ‘m’ bits apparently non-contiguous looks weird.
+
+Also, mis-spelling of the first occurrence of pragma Attribute_Definition.
+Simon Wright
+Jan 29th, 2013 	
+With GNAT GPL 2012 on Mac OS X Mountain Lion, the BE output isn’t as stated.
+
+$ ./endianness_demo 
+ Default bit order: LOW_ORDER_FIRST
+ N     : 32 102
+ LE_Bits: 32 102
+ BE_Bits: 140 65
+ LE:    32 102
+ BE:    32 102
+Thomas Quinot
+Jan 30th, 2013 	
+Simon,
+ Thanks for catching the typo—fixed!
+
+Let me clarify the diagram. The two halves represent two succesive positions in memory, numbered in the ``natural’’ way: the lower address left, the higher address right. And since we are on a little-endian machine, of course the lower order byte is stored first, i.e. left. Within each cell of the box, the binary values are shown in the usual notation: most significant bit on the left.
+
+The bits of ‘m’ appear non-contiguous on this diagram, but in reality there is no notion of contiguity of the sequence of bits across different bytes: memory stores a sequence of bytes, not a sequence of bits. It might be clearer to visualize the diagram as:
+Address | Fields    | Binary value
+--------+-----------+-------------
+n       | m yyyyyyy | 0 0100000
+n+1     | ddddd mmm | 01100 110
+
+ 
+Thomas Quinot
+Feb 1st, 2013 	
+Simon,
+
+Indeed we have observed the behaviour you describe with GNAT GPL 2012. This release was branched at a point in time where development and field testing of the Scalar_Storage_Order attribute was still in progress. However we opted to include it as it was at the time to give users a chance to experiment with this preliminary version.
+
+This issue of course has been fixed since then in GNAT Pro, and was not present anymore where Scalar_Storage_Order was officially announced on 2012-08-04. An alternate version of the test case, which works with GNAT GPL 2012 as well, is now available above. The next GPL release (GNAT GPL 2013, which should be released in June) will also include the fix as well, and will produce the same result with both test cases.
+
+Thomas.
+Simon Wright
+Feb 1st, 2013 	
+Thomas,
+
+Thanks for the updated demo, which does indeed behave as expected with GNAT GPL 2012.
+
+Just for info, GCC 4.8 experimental r195611 still gives the same wrong answer.
+Thomas Quinot
+Feb 1st, 2013 	
+The results you are seeing on GCC 4.8 are expected as the required changes in the back-end have not been merged at the FSF yet.
+Matt
+Apr 16th, 2013 	
+Will this be in GCC 4.9?
+Eric Botcazou
+Apr 17th, 2013 	
+We’ll create a branch in the GCC repository and start a discussion about its integration for GCC 4.9 but the outcome isn’t guaranteed as considerations from other languages might come into play.
+
+ 
+Leave a Comment
+Have an idea for a Gem?
+
+If you have an idea for a Gem you would like to contribute please feel free to contact us at: gems@adacore.com
+
+
+
+Comment:
+  Remember my personal information
+ Notify me of follow-up comments?
+
+Please enter the word you see in the image below:		
+ 	Privacy & Terms
+
+
+ 
+Home
+Contact
+Pricing
+News
+Blog
+Partners
+Mailing List
+Site Map
+RSS
+Twitter
+
+Copyright © 2014 AdaCore. All Rights Reserved.
+ShareThis Copy and Paste

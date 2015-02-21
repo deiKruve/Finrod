@@ -1,0 +1,299 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<diagram program="umlet" version="13.2">
+  <zoom_level>10</zoom_level>
+  <element>
+    <id>UMLPackage</id>
+    <coordinates>
+      <x>230</x>
+      <y>130</y>
+      <w>830</w>
+      <h>530</h>
+    </coordinates>
+    <panel_attributes>finrod-net
+--
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+top level
+has the eth driver
+
+
+
+arp table is always there
+any of arp, time, reqrep or others
+may be attached at any time
+by registering with finrod-net.
+
+specific frame details are in the child packages
+
+The whole circus is driven by a polling fsm, so individual actions must stay short
+dont know if there might be a job-post facility, outside of the fsm. sometimes needed perhaps.
+halign=left
+bg=light_gray</panel_attributes>
+    <additional_attributes/>
+  </element>
+  <element>
+    <id>UMLPackage</id>
+    <coordinates>
+      <x>700</x>
+      <y>170</y>
+      <w>100</w>
+      <h>130</h>
+    </coordinates>
+    <panel_attributes>arp
+bg=yellow</panel_attributes>
+    <additional_attributes/>
+  </element>
+  <element>
+    <id>UMLPackage</id>
+    <coordinates>
+      <x>700</x>
+      <y>320</y>
+      <w>100</w>
+      <h>120</h>
+    </coordinates>
+    <panel_attributes>Time
+bg=yellow</panel_attributes>
+    <additional_attributes/>
+  </element>
+  <element>
+    <id>UMLPackage</id>
+    <coordinates>
+      <x>700</x>
+      <y>450</y>
+      <w>100</w>
+      <h>140</h>
+    </coordinates>
+    <panel_attributes>ReqRep
+bg=yellow</panel_attributes>
+    <additional_attributes/>
+  </element>
+  <element>
+    <id>UMLGeneric</id>
+    <coordinates>
+      <x>230</x>
+      <y>330</y>
+      <w>220</w>
+      <h>170</h>
+    </coordinates>
+    <panel_attributes/>
+    <additional_attributes/>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>0</x>
+      <y>330</y>
+      <w>290</w>
+      <h>60</h>
+    </coordinates>
+    <panel_attributes>lt=[poll for frame]-&gt;&gt;&gt;&gt;&gt;
+reply with
+frame to execute
+</panel_attributes>
+    <additional_attributes>230.0;20.0;10.0;20.0</additional_attributes>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>430</x>
+      <y>230</y>
+      <w>330</w>
+      <h>140</h>
+    </coordinates>
+    <panel_attributes>lt=[check frame]-&gt;&gt;&gt;&gt;&gt;
+
+</panel_attributes>
+    <additional_attributes>270.0;10.0;190.0;10.0;70.0;120.0;10.0;120.0</additional_attributes>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>430</x>
+      <y>350</y>
+      <w>330</w>
+      <h>60</h>
+    </coordinates>
+    <panel_attributes>lt=[check frame]-&gt;&gt;&gt;&gt;&gt;
+
+</panel_attributes>
+    <additional_attributes>270.0;40.0;200.0;40.0;70.0;10.0;10.0;10.0</additional_attributes>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>430</x>
+      <y>360</y>
+      <w>330</w>
+      <h>180</h>
+    </coordinates>
+    <panel_attributes>lt=[check frame]-&gt;&gt;&gt;&gt;&gt;
+
+</panel_attributes>
+    <additional_attributes>270.0;160.0;190.0;160.0;70.0;10.0;10.0;10.0</additional_attributes>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>40</x>
+      <y>160</y>
+      <w>320</w>
+      <h>50</h>
+    </coordinates>
+    <panel_attributes>lt=[execute next frame that was polled]-&lt;
+
+</panel_attributes>
+    <additional_attributes>190.0;20.0;10.0;20.0</additional_attributes>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>280</x>
+      <y>340</y>
+      <w>160</w>
+      <h>40</h>
+    </coordinates>
+    <panel_attributes>lt=&lt;.&gt;</panel_attributes>
+    <additional_attributes>140.0;20.0;10.0;10.0</additional_attributes>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>40</x>
+      <y>190</y>
+      <w>730</w>
+      <h>50</h>
+    </coordinates>
+    <panel_attributes>lt=[send some frame]-&lt;
+
+</panel_attributes>
+    <additional_attributes>660.0;20.0;10.0;20.0</additional_attributes>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>40</x>
+      <y>210</y>
+      <w>730</w>
+      <h>170</h>
+    </coordinates>
+    <panel_attributes>lt=[send some frame]-&lt;
+
+</panel_attributes>
+    <additional_attributes>660.0;150.0;490.0;60.0;220.0;60.0;130.0;10.0;10.0;10.0</additional_attributes>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>40</x>
+      <y>220</y>
+      <w>730</w>
+      <h>290</h>
+    </coordinates>
+    <panel_attributes>lt=[send some frame]-&lt;
+
+</panel_attributes>
+    <additional_attributes>660.0;270.0;490.0;80.0;240.0;80.0;130.0;10.0;10.0;10.0</additional_attributes>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>410</x>
+      <y>470</y>
+      <w>320</w>
+      <h>110</h>
+    </coordinates>
+    <panel_attributes>lt=[send frame]-[&lt;]
+</panel_attributes>
+    <additional_attributes>40.0;10.0;100.0;10.0;210.0;90.0;300.0;90.0</additional_attributes>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>410</x>
+      <y>410</y>
+      <w>320</w>
+      <h>60</h>
+    </coordinates>
+    <panel_attributes>lt=[send frame]-[&lt;]
+</panel_attributes>
+    <additional_attributes>40.0;40.0;130.0;40.0;200.0;10.0;300.0;10.0</additional_attributes>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>410</x>
+      <y>270</y>
+      <w>320</w>
+      <h>170</h>
+    </coordinates>
+    <panel_attributes>lt=[send frame]-[&lt;]
+</panel_attributes>
+    <additional_attributes>40.0;150.0;110.0;150.0;230.0;10.0;300.0;10.0</additional_attributes>
+  </element>
+  <element>
+    <id>UMLPackage</id>
+    <coordinates>
+      <x>930</x>
+      <y>230</y>
+      <w>100</w>
+      <h>130</h>
+    </coordinates>
+    <panel_attributes>arp-table
+bg=yellow</panel_attributes>
+    <additional_attributes/>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>790</x>
+      <y>250</y>
+      <w>190</w>
+      <h>50</h>
+    </coordinates>
+    <panel_attributes>lt=[arp entry]-
+
+</panel_attributes>
+    <additional_attributes>140.0;20.0;10.0;20.0</additional_attributes>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>780</x>
+      <y>290</y>
+      <w>190</w>
+      <h>110</h>
+    </coordinates>
+    <panel_attributes>lt=[arp req]-&gt;&gt;&gt;&gt;
+
+</panel_attributes>
+    <additional_attributes>150.0;10.0;90.0;10.0;50.0;90.0;10.0;90.0</additional_attributes>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>780</x>
+      <y>320</y>
+      <w>190</w>
+      <h>210</h>
+    </coordinates>
+    <panel_attributes>lt=[arp req]-&gt;&gt;&gt;&gt;
+
+</panel_attributes>
+    <additional_attributes>150.0;10.0;100.0;10.0;50.0;190.0;10.0;190.0</additional_attributes>
+  </element>
+</diagram>
