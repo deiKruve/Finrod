@@ -62,7 +62,9 @@ package Finrod.Net is
    
    
    type Test_Reply_Type is (Fits,
-			    Fits_With_Error, -- there is a sender and an id!
+			    Stashed_For_Sending,  -- must be processed later
+			    Stashed_For_ArpTable, -- must be processed later
+			    Fits_With_Error,      -- there is a sender and an id!
 			    No_Fit);
    -- reply type of the test_frame functions in the children.
    
@@ -113,6 +115,17 @@ package Finrod.Net is
    -- here for transmission.
    -- the frame can ony be released once it has been successfully sent.
    -- lets see if this works as a queueing mechanism.
+   
+   procedure Stash_For_Sending (Ba : Frame_Address; Bbc : Frame_Length_Type);
+   -- queues a frame for sending,
+   -- it is meant as a stage2 repost action, which can be executed just now
+   
+   procedure Send_Next;
+   -- sends the next queued item. note that normally there should be
+   -- no more than 1 item on the stack.
+   -- so this command should happen after Stash_For_Sending without any
+   -- ethernet send activity in between.
+   -- use Poll_Xmit_Completed after this command to ascertain its gone.
    
 private
    --  type Frame is tagged record 

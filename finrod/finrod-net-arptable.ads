@@ -2,7 +2,7 @@
 --                                                                          --
 --                            FINROD COMPONENTS                             --
 --                                                                          --
---                            F I N R O D . S P Y                           --
+--                   F I N R O D . N E T . A R P T A B L E                  --
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
@@ -27,39 +27,29 @@
 --                                                                          --
 ------------------------------------------------------------------------------
 --
--- this is a state machine to work the serial com port.
--- and do diagnostics 
--- It works as described in finrod-thread.ads
+-- the system address table
 --
 
-package Finrod.Spy is
+package Finrod.Net.Arptable is
    
-   type State_Selector_Type is (Spy_Health_Check,
-				Spy_Is_Receiver_Full,
-				Spy_Wait_For_Receiver_Empty,
-				Spy_Try_Parse_Rsttimer,
-				Spy_Try_Parse_Rtime,
-				Spy_Echo_Junk,
-				Spy_Rebase_Incoming,
-				Idle);
-   -- possible states of the state machine
+   procedure Stash (Sha : Stm.Bits_48; 
+		    Spa : Stm.Bits_32);
+   -- stash an address pair.
    
-			       
-   procedure Insert_Spy;
-   -- initializes the Spy at Spy_Health_Check and
-   -- inserts the spy into the loop of things.
+   procedure Process_Stash;
+   -- process any stashed address pairs.
    
-   procedure Delete_Spy;
-   -- synchronizes the Spy and takes it out of 
-   -- the loop of things.
+   procedure Enter (Sha : Stm.Bits_48; 
+		    Spa : Stm.Bits_32);
+   -- enter an address pair in the table
    
-   procedure Change_Spy_State ( St : State_Selector_Type);
-   -- to get out of a knot
-   -- not very useful here
+   function Exists (Sha : Stm.Bits_48) return Boolean;
+   -- see if a mac address exists in the system
    
-   -- use
-   -- Finrod.Sermon.Send_String (S : String); 
-   -- to display anything on the v24 terminal
-   -- on a Spy request.
+   function Find (Sha : Stm.Bits_48) return Stm.Bits_32;
+   -- find an ip address for a given mac address
    
-end Finrod.Spy;
+   function Find (Spa : Stm.Bits_32) return Stm.Bits_48;
+   -- find a mac address for a given ip address
+   
+end Finrod.Net.Arptable;

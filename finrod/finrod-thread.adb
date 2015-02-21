@@ -43,7 +43,7 @@ package body Finrod.Thread is
    begin
       Job_Entry.Job  := Ds;
       Job_Entry.Next := Job_List;
-      Job_List        := Job_Entry;
+      Job_List       := Job_Entry;
    end Insert_Job;
    
    

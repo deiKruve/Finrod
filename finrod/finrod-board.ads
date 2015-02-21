@@ -31,10 +31,13 @@
 -- of the board for powerlink.
 --
 
+with STM32F4;
+
 package Finrod.Board is
    
    subtype Board_Id is Natural;
-   subtype Epl_Address is Natural;
+   subtype Mac_Address is STM32F4.Bits_48;
+   subtype Ip_Address  is STM32F4.Bits_32;
    
    procedure Init_Pins;
    -- inits the basic board with serial and eth comms and id pins
@@ -43,10 +46,15 @@ package Finrod.Board is
    
    function Get_Id return Board_Id;
    -- returns the board id
-   -- this is supposed to guide the foftware into executing the 
+   -- this is supposed to guide the software into executing the 
    -- right subset of functions.
    
-   function Get_Epl_Address return Epl_Address;
-   -- returns the powerlink address set on hardware switches
+   function Get_Mac_Address return Mac_Address;
+   -- returns the mac address. This is the systems basic Mac address with 
+   -- the address set on hardware switches as the last group
+   
+   function Get_Ip_Address return Ip_Address;
+   -- returns the ip address. this is the systems basic IP address with
+   -- the address set on hardware switches as the last group
    
 end Finrod.Board;

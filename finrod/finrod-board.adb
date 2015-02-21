@@ -130,11 +130,18 @@ package body Finrod.Board is
   end Get_Id;
   
   
-  function Get_Epl_Address return Epl_Address
+  function Get_Mac_Address return Mac_Address
   is
   begin
      return 0;
-  end Get_Epl_Address;
+  end Get_Mac_Address;
+  
+  
+  function Get_Ip_Address return Ip_Address
+  is
+  begin
+     return 0;
+  end Get_Ip_Address;
   
   
 end Finrod.Board;

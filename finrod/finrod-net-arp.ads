@@ -41,6 +41,14 @@ package Finrod.Net.Arp is
    Mac_Null : constant Stm.Bits_48 := 16#00_00_00_00_00_00#;
    Ip_Null  : constant Stm.Bits_32 := 16#00_00_00_00#;
    
+   Arp_Proto : constant Stm.Bits_16 := 16#0806#; -- eth protocol
+   Arp_Htype : constant Stm.Bits_16 := 1;        -- Hardware type 
+   Arp_Ptype : constant Stm.Bits_16 := 16#0800#; -- Protocol type IPv4
+   Arp_Hlen  : constant Stm.Byte    := 6;        -- Hardware address length
+   Arp_Plen  : constant Stm.Byte    := 4;        -- ip address length
+   Arp_Req   : constant Stm.Bits_16 := 1;        -- mode: 1 = request
+   Arp_Rep   : constant Stm.Bits_16 := 2;        -- mode: 2 = reply
+   
    type Arp_Packet is new Frame with record
       Dest    : Stm.Bits_48 := Mac_xmas; -- destination mac address, broadcast
       Srce    : Stm.Bits_48 := Mac_null; -- sender i/f mac address
@@ -94,8 +102,19 @@ package Finrod.Net.Arp is
 			     Arp_Announce);
    -- different types of arp frames that might be send,
    
-   procedure Send_Arp_Request (Req : Arp_Request_Type);
+   function Send_Arp_Request (Req : Arp_Request_Type  := Arp_Probe; 
+			      Tpa : Stm.Bits_32       := Ip_Null)
+     return Test_Reply_Type;
    -- builds an ARP frame and transmits it
    -- note that you have to poll for any anwer yourself, if needed.
    
+   procedure Display_Last_Received;
+   -- for debugging.
+   -- sends the content of the last received frame to the spy.
+   
+   procedure Display_Last_Xmitted;
+   -- for debugging.
+   -- sends the content of the last transmitted frame to the spy.
+   
 end Finrod.Net.Arp;
+
