@@ -30,6 +30,19 @@
 -- implements basic board functions necessary to bring up the rest 
 -- of the board for powerlink.
 --
+-- A Note on Board addresses:
+-- if we start of with the 10.0.0.0 net
+-- and if we use the last but 1 group for the board addressing then
+-- we have 255 addresses on each board for mailboxes outside the high speed 
+-- interface, for calibration, id strings etc.
+-- it is proposed that the master lives at address 10.0.1.0
+-- if we leave the addresses 250 .. 255 unused for evt spy boxes, bridges etc
+-- that gives a maximum of 248 stations (10.0.2.0/255 .. 10.0.249.0/255).
+--
+-- a 2nd note on board addresses:
+-- the last but 1 group of both the ip address and the mac address of
+-- Each Board can contain the Board ID that is set up on the hardware.
+
 
 with STM32F4;
 
@@ -49,12 +62,48 @@ package Finrod.Board is
    -- this is supposed to guide the software into executing the 
    -- right subset of functions.
    
-   function Get_Mac_Address return Mac_Address;
+   function Get_Mac_Address return Mac_Address with Inline;
    -- returns the mac address. This is the systems basic Mac address with 
    -- the address set on hardware switches as the last group
    
-   function Get_Ip_Address return Ip_Address;
+   function Get_Ip_Address return Ip_Address with Inline;
    -- returns the ip address. this is the systems basic IP address with
    -- the address set on hardware switches as the last group
+   
+   function Get_Master_Ip_Address return Ip_Address with Inline;
+   -- returns the ip address of the bus master,
+   -- hope this can stay here
+   
+   procedure Set_Id (Id : Board_Id) with Inline;
+   -- sets the board id and incorporates it into the net addresses
+   -- as explained above.
+   -- this should really be an internal procedure, but jus in case it is 
+   -- declared here.
+   
+   procedure Set_Mac_Address (M : Mac_Address) with Inline;
+   -- Sets the mac address of the stm board.
+   -- To be set by the application.
+   
+   procedure Set_Ip_Address (Ip : Ip_Address) with Inline;
+   -- Sets the ip address of the stm board.
+   -- To be set by the application.
+   
+   procedure Set_Master_Ip_Address (Ip : Ip_Address) with Inline;
+   -- Sets the ip address of the bus masternode.
+   -- To be set by the application if needed.
+   -- Easiest would be to leave it where it is.
+   
+private
+   
+   My_Mac_Address       : Stm32F4.Bits_48  := 16#02_00_00_00_00_00#;
+   My_Ip_Address        : Stm32F4.Bits_32  := 16#10_00_00_00#;
+   -- the addresses of the board.
+   -- To be set by the application
+   -- by setting the board id it should happen automagically
+   
+   Master_Ip_Address : Stm32F4.Bits_32  := 16#10_00_01_00#;
+   -- the Ip Address of the master node
+   -- must also be set by the application if change is needed
+   
    
 end Finrod.Board;

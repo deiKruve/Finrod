@@ -2,7 +2,7 @@
 --                                                                          --
 --                            FINROD COMPONENTS                             --
 --                                                                          --
---                           F I N R O D . A P P                            --
+--                            S AM P L E _ A P P                            --
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
@@ -27,16 +27,14 @@
 --                                                                          --
 ------------------------------------------------------------------------------
 --
--- this is the interface to the customer aplication
 
 
-package Finrod.App is
+package Sample_App is
    
-   procedure Init_app;
-   -- called by the nmt-init state machine
+   procedure Init;
+   -- initializes the application,
+   -- it is normally only used internally. 
+   -- it is called via an uplink, that is initialized in the application body,
+   -- from the finrod library
    
-   Init : access procedure; 
-   -- link to customers init procedure
-   
-end Finrod.App;
-  
+end Sample_App;

@@ -4,7 +4,7 @@
 --                                                                          --
 --                           F I N R O D . A P P                            --
 --                                                                          --
---                                 S p e c                                  --
+--                                 B o d y                                  --
 --                                                                          --
 --                     Copyright (C) 2015, Jan de Kruyf                     --
 --                                                                          --
@@ -30,13 +30,13 @@
 -- this is the interface to the customer aplication
 
 
-package Finrod.App is
+package body Finrod.App is
    
-   procedure Init_app;
    -- called by the nmt-init state machine
-   
-   Init : access procedure; 
-   -- link to customers init procedure
-   
+   procedure Init_App
+   is
+   begin
+      Init.all;
+   end Init_App;
+    
 end Finrod.App;
-  

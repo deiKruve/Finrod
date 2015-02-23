@@ -60,6 +60,16 @@ package body Finrod.Nmt_Init is
 	    -- Initialize the basic board with comms, timer, etc
 	    -- insofar not done on the ada startup layer
 	    Finrod.Board.Init_Pins;
+	    
+	    -- board.set_macaddress         -- if special
+	    -- board.set_ip_address         -- if special
+	    
+	    -- reads the hw id and applies it to the net addresses
+	    Finrod.Board.Set_Id; 
+	    -- reads the hw id and applies it to the net addresses
+	    
+	    -- board.set_master_ip_address  -- if special
+	    
 	    Fsm_State := Nmt_Gs_Reset_Application;
 	    
 	 when Nmt_Gs_Reset_Application   =>
@@ -112,5 +122,7 @@ package body Finrod.Nmt_Init is
       Thr.Insert_Job (Fsm'Access);
    end NMT_Reset_Configuration;
    
-   
+begin
+   NMT_Sw_Reset;
+   Thr.Scan;
 end Finrod.Nmt_Init;

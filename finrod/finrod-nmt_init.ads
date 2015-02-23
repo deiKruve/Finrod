@@ -43,6 +43,10 @@ package Finrod.Nmt_Init is
 				Nmt_Gs_Reset_Configuration,
 				Idle);
    
+   procedure Fsm;
+   -- the init state machine
+   -- insert it into the run thread to srt the board. or!????
+   
    procedure NMT_Sw_Reset;
    -- resets to Nmt_Gs_Initialising
    -- and inserts this fsm onto the jobstack.

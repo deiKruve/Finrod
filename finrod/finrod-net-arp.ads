@@ -106,13 +106,14 @@ package Finrod.Net.Arp is
 			      Tpa : Stm.Bits_32       := Ip_Null)
      return Test_Reply_Type;
    -- builds an ARP frame and transmits it
+   -- Tpa: 
    -- note that you have to poll for any anwer yourself, if needed.
    
-   procedure Display_Last_Received;
+   procedure Display_Received (Num : Positive := 1);
    -- for debugging.
    -- sends the content of the last received frame to the spy.
    
-   procedure Display_Last_Xmitted;
+   procedure Display_Xmitted (Num : Positive := 1);
    -- for debugging.
    -- sends the content of the last transmitted frame to the spy.
    

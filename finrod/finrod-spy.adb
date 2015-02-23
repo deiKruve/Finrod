@@ -33,21 +33,29 @@
 --
 
 with System;
+with Finrod.Board;
 with Finrod.Sermon;
 with Finrod.Thread;
 with Finrod.Timer;
+with Finrod.Net.Arp;
 with Finrod.Last_Chance_Handler;
 
 package body Finrod.Spy is
-   package V24  renames Finrod.Sermon;
-   package Thr  renames Finrod.Thread;
-   package Flch renames Finrod.Last_Chance_Handler;
+   
+   package Board renames Finrod.Board;
+   package V24   renames Finrod.Sermon;
+   package Thr   renames Finrod.Thread;
+   package Flch  renames Finrod.Last_Chance_Handler;
    package Timer renames Finrod.Timer;
+   package Net   renames Finrod.Net;
+   package Arp   renames Finrod.Net.Arp;
+   
    
    --------------------------------
    -- constants,                 --
    -- definitions and local vars --
    --------------------------------
+   
    Error_String : constant String:= "Finrod.Spy: Uart did not start";
    Fsm_State             : State_Selector_Type := Idle;
    Disappearance_Request : Boolean             := False;
@@ -64,6 +72,7 @@ package body Finrod.Spy is
    procedure Fsm
    is
       use type V24.Uart_Data_Type;
+      Dummy_Reply : Net.Test_Reply_Type;
    begin
       case Fsm_State is
 	 when Spy_Health_Check            =>
@@ -116,6 +125,63 @@ package body Finrod.Spy is
 		    "   " & 
 		    Timer.Time_Interval'Image (Timer.Report_Max_Duration) &
 		    " clock ticks.");
+	       Fsm_State := Spy_Rebase_Incoming;
+	    else Fsm_State := Spy_Echo_Junk;
+	    end if;
+	    
+	 when Spy_Try_Parse_Arp_Req       =>
+	    if V24.Serial_Recd_Data_A.all (First .. First + 5) = 
+	      "xarp" then
+	       if V24.Serial_Recd_Data_A.all (First + 6 .. First + 8) = 
+		 "req" then
+		  Dummy_Reply := Arp.Send_Arp_Request 
+		    (Arp.Arp_Request, Board.Get_Master_Ip_Address);
+		  Fsm_State := Spy_Rebase_Incoming;
+	       elsif V24.Serial_Recd_Data_A.all (First + 6 .. First + 9) =
+		 "prob" then
+		  Dummy_Reply := Arp.Send_Arp_Request 
+		    (Arp.Arp_Probe, Board.Get_Ip_Address);
+		  Fsm_State := Spy_Rebase_Incoming;
+	       elsif V24.Serial_Recd_Data_A.all (First + 6 .. First + 8) =
+		 "ann" then
+		  Dummy_Reply := Arp.Send_Arp_Request 
+		    (Arp.Arp_Announce, Board.Get_Ip_Address);
+		  Fsm_State := Spy_Rebase_Incoming;
+	       else 
+		  Fsm_State := Spy_Echo_Junk;
+	       end if;
+	    else
+	       Fsm_State := Spy_Echo_Junk;
+	    end if;
+	    
+	 when Spy_Try_Parse_Show_Farp     =>
+	    if V24.Serial_Recd_Data_A.all (First .. First + 5) = 
+	      "lsrarp" then
+	       declare 
+		  I : Integer := First + 6;
+		  J : Natural range 0 .. 9;
+	       begin
+		  while V24.Serial_Recd_Data_A.all (I) = ' ' loop
+		     I := I + 1;
+		  end loop;
+		  J := Positive'Value 
+		    (String (V24.Serial_Recd_Data_A.all (I .. I)));
+		  if J /= 0 then Arp.Display_Received (J); end if;
+	       end;
+	       Fsm_State := Spy_Rebase_Incoming;
+	    elsif V24.Serial_Recd_Data_A.all (First .. First + 5) = 
+	      "lsxarp" then
+	       declare 
+		  I : Integer := First + 6;
+		  J : Natural range 0 .. 9;
+	       begin
+		  while V24.Serial_Recd_Data_A.all (I) = ' ' loop
+		     I := I + 1;
+		  end loop;
+		  J := Positive'Value 
+		    (String (V24.Serial_Recd_Data_A.all (I .. I)));
+		  if J /= 0 then Arp.Display_Xmitted (J); end if;
+	       end;
 	       Fsm_State := Spy_Rebase_Incoming;
 	    else Fsm_State := Spy_Echo_Junk;
 	    end if;

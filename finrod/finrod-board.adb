@@ -41,12 +41,20 @@ with Finrod.Sermon;
 
 package body Finrod.Board is
    
-  package Stm  renames STM32F4;
-  package Gpio renames STM32F4.Gpio;
-  package R    renames STM32F4.O7xx.Registers;
-  package Rcc  renames STM32F4.O7xx.Rcc;
+   package Stm  renames STM32F4;
+   package Gpio renames STM32F4.Gpio;
+   package R    renames STM32F4.O7xx.Registers;
+   package Rcc  renames STM32F4.O7xx.Rcc;
   
   
+   --------------------------------
+   -- constants,                 --
+   -- definitions and local vars --
+   --------------------------------
+   
+   My_Id : Board_Id;
+   
+   
   -- inits the pins and then calls any other init functions --
   -- that might be needed                                   --
   --  procedure Init_Pins_Olimex 
@@ -126,22 +134,65 @@ package body Finrod.Board is
   function Get_Id return Board_Id
   is
   begin
-     return 0;
+     return My_id;
   end Get_Id;
   
   
   function Get_Mac_Address return Mac_Address
   is
   begin
-     return 0;
+     return My_Mac_Address;
   end Get_Mac_Address;
   
   
   function Get_Ip_Address return Ip_Address
   is
   begin
-     return 0;
+     return My_Ip_Address;
   end Get_Ip_Address;
+  
+  
+  function Get_Master_Ip_Address return Ip_Address
+  is
+  begin
+     return Master_Ip_Address;
+  end Get_Master_Ip_Address;
+  
+  
+  procedure Set_Id (Id : Board_Id)
+  is
+     use type Stm.Bits_16;
+     use type Stm.Bits_32;
+     use type Stm.Bits_48;
+     Tid : Stm.Bits_16 := Stm.Bits_16 (Id) * 16#100#;
+  begin
+     My_Id := Id;
+     My_Mac_Address := 
+       (My_Mac_Address and 16#ff_ff_ff_ff_00_ff#) or Stm.Bits_48 (Tid);
+     My_Ip_Address  := 
+       (My_Ip_Address and 16#ff_ff_00_ff#) or Stm.Bits_32 (Tid);
+  end Set_Id;
+  
+  
+  procedure Set_Mac_Address (M : Mac_Address)
+  is
+  begin
+     My_Mac_Address := M;
+  end Set_Mac_Address;
+  
+  
+  procedure Set_Ip_Address (Ip : Ip_Address)
+  is
+  begin
+     My_Ip_Address := Ip;
+  end Set_Ip_Address;
+  
+  
+  procedure Set_Master_Ip_Address (Ip : Ip_Address)
+  is
+  begin
+     Master_Ip_Address := Ip;
+  end Set_Master_Ip_Address;
   
   
 end Finrod.Board;

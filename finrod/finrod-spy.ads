@@ -31,6 +31,18 @@
 -- and do diagnostics 
 -- It works as described in finrod-thread.ads
 --
+--
+-- commands so far:
+--  rsttimer                : reset the timer min and max registers
+--                            the prob points must be inserted manually in the code 
+--  rtime                   : report the min and max cycletime collected since reset
+--  xarpreq                 : make an arp request 
+--                        (the request is for the Master_Ip_adrress in Finrod.Board)
+--  xarpprob                : do an arp probe
+--  xarpann                 : make an arp announcement
+--  lsrarp <number 1 .. 9>  : display 'number' received frames
+--  lsxarp <number 1 .. 9>  : display 'number' transmitted frames
+--  
 
 package Finrod.Spy is
    
@@ -39,6 +51,8 @@ package Finrod.Spy is
 				Spy_Wait_For_Receiver_Empty,
 				Spy_Try_Parse_Rsttimer,
 				Spy_Try_Parse_Rtime,
+				Spy_Try_Parse_Arp_Req,
+				Spy_Try_Parse_Show_Farp,
 				Spy_Echo_Junk,
 				Spy_Rebase_Incoming,
 				Idle);

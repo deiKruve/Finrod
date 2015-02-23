@@ -2,9 +2,9 @@
 --                                                                          --
 --                            FINROD COMPONENTS                             --
 --                                                                          --
---                          F I N R O D . B O A R D                         --
+--                            S AM P L E _ A P P                            --
 --                                                                          --
---                                 S p e c                                  --
+--                                 B o d y                                  --
 --                                                                          --
 --                     Copyright (C) 2015, Jan de Kruyf                     --
 --                                                                          --
@@ -27,22 +27,24 @@
 --                                                                          --
 ------------------------------------------------------------------------------
 --
--- implements basic board functions necessary to bring up the rest 
--- of the board for powerlink.
 
-package Finrod.Board is
+with STM32F4;
+with Finrod.Board;
+with Finrod.Nmt_Init;
+with Finrod.App;
+
+package body Sample_App is
+
+   package Stm  renames STM32F4;
+   package Board renames Finrod.Board;
    
-   procedure Init_Pins;
-   -- inits the basic board with serial and eth comms and id pins
-   -- it will call any other  resource init functions 
-   -- that might be needed
+   procedure Init
+   is
+   begin
+      null;
+   end Init;
    
-   function Get_Id return Id : Board_Id;
-   -- returns the board id
-   -- this is supposed to guide the foftware into executing the 
-   -- right subset of functions.
-   
-   function Get_Epl_Address Returs Addr : Epl_Address;
-   -- returns the powerlink address set on hardware switches
-   
-end Finrod.Board;
+begin
+   Finrod.App.Init := Init'Access; -- uplink to the library for initing
+				   -- from there
+end Sample_App;

@@ -28,16 +28,42 @@
 ------------------------------------------------------------------------------
 --
 -- handles arp requests.
+
+-- direct query:
+-- give sender ip- and mac address
+-- give targets ip address, target mac address = null
+-- transmit to xmas
+-- box with the tatget ip address responds with mac address
+--
+-- ARP probe:
+-- sender ip address (SPA) = null, 
+-- to indicate this is a request for conflict resolution
+-- target ip address (TPA) given (my ip address), target mac address (THA) = null
+-- transmit to xmas
+-- box with the target ip address responds with mac address (if any box exists)
+--
+-- ARP announcement:
+-- ARP request containing the senders ip address (SPA) in the 
+-- target field (TPA=SPA).
+--
+-- ARP reply:
+-- Oper = reply
+-- sender ip address (SPA) = the replying IP address
+-- target ip address (TPA) = the questioning IP address (the original requester)
+-- same for MAC addresses
 --
 
+with System.Storage_Elements;
 with Finrod.Board;
 with Finrod.Net.Arptable;
+with Finrod.Sermon;
 
 package body Finrod.Net.Arp is
    
-   Package Board     renames Finrod.Board;
+   package Sse       renames System.Storage_Elements;
+   package Board     renames Finrod.Board;
    package Arp_Table renames Finrod.Net.Arptable;
-   
+   package V24       renames Finrod.Sermon;
    --------------------------------
    -- constants,                 --
    -- definitions and local vars --
@@ -83,6 +109,57 @@ package body Finrod.Net.Arp is
    BArp_Packet_Length : constant Stm.Bits_13 := 40;
    type BArp_Packet_Access_Type is access BArp_Packet;
    
+   Display_Rframes : Natural := 0;
+   Display_Xframes : Natural := 0;
+   
+   
+   ---------------
+   -- utilities --
+   ---------------
+   
+   -- build a byte representation of a frame and send it to the v24 interface --
+   procedure Show (A : System.Address) is
+      Arr : Sse.Storage_Array (1 .. 28);
+      for Arr'Address use A;
+      pragma Import (Ada, Arr);
+   begin
+      declare -- hardcoded for speed
+	 S : String := 
+	   "Arp " &
+	   Arr (1)'Img & ' ' &
+	   Arr (2)'Img & ' ' & 
+	   Arr (3)'Img & ' ' &
+	   Arr (4)'Img & ' ' & 
+	   Arr (5)'Img & ' ' &
+	   Arr (6)'Img & ' ' & 
+	   Arr (7)'Img & ' ' &
+	   Arr (8)'Img & ' ' & 
+	   Arr (9)'Img & ' ' &
+	   Arr (10)'Img & ' ' & 
+	   Arr (11)'Img & ' ' &
+	   Arr (12)'Img & ' ' & 
+	   Arr (13)'Img & ' ' &
+	   Arr (14)'Img & ' ' & 
+	   Arr (15)'Img & ' ' &
+	   Arr (16)'Img & ' ' & 
+	   Arr (17)'Img & ' ' & 
+	   Arr (18)'Img & ' ' &
+	   Arr (19)'Img & ' ' & 
+	   Arr (20)'Img & ' ' &
+	   Arr (21)'Img & ' ' &
+	   Arr (22)'Img & ' ' &
+	   Arr (23)'Img & ' ' &
+	   Arr (24)'Img & ' ' &
+	   Arr (25)'Img & ' ' &
+	   Arr (26)'Img & ' ' &
+	   Arr (27)'Img & ' ' &
+	   Arr (28)'Img & ' ' &
+	   ASCII.LF;
+      begin
+	 V24.Send_String (S);
+      end;
+   end Show;
+   
    ----------------------
    -- public interface --
    ----------------------
@@ -99,6 +176,7 @@ package body Finrod.Net.Arp is
       use type Stm.Byte;
       F : BArp_Packet;
       for F'Address use Ba;
+
    begin
       if    F.Proto /= Arp_Proto then return No_Fit;
       elsif F.Ptype /= Arp_Ptype then return No_Fit;
@@ -109,25 +187,52 @@ package body Finrod.Net.Arp is
       
       elsif F.Spa    = Ip_Null and F.Sha   = Mac_Null then 
 	 -- arp probe
+	 -- nothing to the arptable since the sender is confused
+	 -- reply directly
+	 if Display_Rframes > 0 then Show (Ba); end if;
 	 F.Oper := 2;
 	 F.Sha  := Board.Get_Mac_Address;
 	 F.Spa  := Board.Get_Ip_Address;
-	 F.Tha  := F.Srce;   -- this is the sender. to be entered in the dict?
+	 F.Tha  := F.Srce;
 	 F.Dest := F.Srce;
 	 F.Srce := Board.Get_Mac_Address;
 	 Stash_For_Sending (Ba, Bbc);
+	 if Display_Xframes > 0 then Show (Ba); end if;
 	 return Stashed_For_Sending;
 	 
       elsif F.Tpa = F.Spa and F.Tha = Mac_null then   
 	 -- arp.anouncement.
+	 if Display_Rframes > 0 then Show (Ba); end if;
 	 Arp_Table.Stash (F.Sha, F.Spa);
 	 return Stashed_For_ArpTable;
 	 
+      elsif F.Oper = Arp_Req and F.Tpa = Board.Get_Ip_Address then
+	 -- regular arp request
+	 if Display_Rframes > 0 then Show (Ba); end if;
+	 Arp_Table.Stash (F.Sha, F.Spa); -- remember the sender, for later entry
+	 F.Srce := Board.Get_Mac_Address;
+	 F.Dest := Mac_Xmas;
+	 F.Oper := 2;
+	 F.Tha  := F.Sha;
+	 F.Sha  := F.Srce;
+	 declare
+	    FSpa   : Stm.Bits_32 := F.Tpa;
+	    Ftpa   : Stm.Bits_32 := F.Spa;
+	 begin
+	    F.Tpa  := Ftpa;
+	    F.Spa  := Fspa;
+	    Stash_For_Sending (Ba, Bbc);
+	    if Display_Xframes > 0 then Show (Ba); end if;
+	    return Stashed_For_Sending;
+	 end;
+	 
       elsif F.Oper = Arp_Rep then
-	 -- fish the content out of a reply packet, 
+	 -- fish the content out of any reply packet, 
 	 -- must reply packets be broadcast then?
+	 if Display_Rframes > 0 then Show (Ba); end if;
 	 Arp_Table.Stash (F.Sha, F.Spa);
 	 Arp_Table.Stash (F.Tha, F.Tpa);
+	 return Stashed_For_ArpTable;
       end if;
       
       return No_Fit; -- non reachable code, but thats what the compiler likes
@@ -163,9 +268,11 @@ package body Finrod.Net.Arp is
 	 when Arp_Probe    =>
 	    F.Sha := Mac_Null;
 	    F.Spa := Ip_Null;
+	    F.Tpa   := Tpa; -- see if our address is in use somewhere
 	 when Arp_Announce =>
 	    F.Spa   := Board.Get_Ip_Address;
-	    F.Tpa := F.Spa;
+	    F.Sha   := F.Srce;
+	    F.Tpa   := F.Spa; -- to indicate an anouncement.
 	    --F.Tha := Mac_null;
       end case;
       Stash_For_Sending (F.all'Address , BArp_Packet_Length);
@@ -175,23 +282,24 @@ package body Finrod.Net.Arp is
    
    
    -- for debugging.
-   -- sends the content of the last received frame to the spy.
-   procedure Display_Last_Received
+   -- sends the content of the next received frame to the spy.
+   procedure Display_Received (Num : Positive := 1)
    is
-      
    begin
-      null;
-   end Display_Last_Received;
+      Display_Rframes := Num;
+   end Display_Received;
    
    
    -- for debugging.
-   -- sends the content of the last transmitted frame to the spy.
-   procedure Display_Last_Xmitted
+   -- sends the content of the next transmitted frame to the spy.
+   procedure Display_Xmitted (Num : Positive := 1)
    is
    begin
-      null;
-   end Display_Last_Xmitted;
+      Display_Xframes := Num;
+   end Display_Xmitted;
    
-   
+   -- how and when do we wipe a spend frame?
+   -- So The Polling Must Happen Here !?
+     -- as soon as a new one is transmitted! so have a pointer.
    
 end Finrod.Net.Arp;
