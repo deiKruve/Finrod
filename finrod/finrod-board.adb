@@ -164,7 +164,7 @@ package body Finrod.Board is
      use type Stm.Bits_16;
      use type Stm.Bits_32;
      use type Stm.Bits_48;
-     Tid : Stm.Bits_16 := Stm.Bits_16 (Id) * 16#100#;
+     Tid : constant Stm.Bits_16 := Stm.Bits_16 (Id) * 16#100#;
   begin
      My_Id := Id;
      My_Mac_Address := 

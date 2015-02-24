@@ -1,12 +1,10 @@
 
---with System.BB.Board_Support;
-
--- this is a dummy module, for compiling on x86
+with System.BB.Board_Support;
 
 package Finrod.Timer is
    
    pragma Warnings (Off, "*internal GNAT unit");
-   subtype Time_Interval is Integer;
+   subtype Time_Interval is System.BB.Board_Support.Timer_Interval;
    -- I think this is in nanoseconds, but do check
    -- units: 1 masterclock period = 5.95238095238e-9 seconds
    -- for a 168_000_000 clock.

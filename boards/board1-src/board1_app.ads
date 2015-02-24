@@ -1,10 +1,10 @@
 ------------------------------------------------------------------------------
 --                                                                          --
---                            FINROD COMPONENTS                             --
+--                           Gmac Plc COMPONENTS                            --
 --                                                                          --
---                         F I N R O D . T H R E A D                        --
+--                           B O A R D 1 _ A P P                            --
 --                                                                          --
---                                 B o d y                                  --
+--                                 S p e c                                  --
 --                                                                          --
 --                     Copyright (C) 2015, Jan de Kruyf                     --
 --                                                                          --
@@ -22,66 +22,20 @@
 -- see the files COPYING3 and COPYING.RUNTIME respectively.  If not, see    --
 -- <http://www.gnu.org/licenses/>.                                          --
 --                                                                          --
---                Finrod  is maintained by J de Kruijf Engineers            --
+--               Gmac Plc is maintained by J de Kruijf Engineers            --
 --                     (email: jan.de.kruyf@hotmail.com)                    --
 --                                                                          --
 ------------------------------------------------------------------------------
 --
--- the jobber structure of finrod
---
+-- this is a first try at an application for an STM32 board, controlled by 
+-- the Finrod fieldbus structure and mini polling os
 
-with Ada.Unchecked_Deallocation;
-
-with Finrod.Timer;
-
-package body Finrod.Thread is
-   package Timer renames Finrod.Timer;
+package Board1_App is
    
-   procedure Insert_Job (Ds : Job_Proc_P_Type)
-   is
-      Job_Entry : constant Job_Entry_P_Type := new Job_Entry_Type;
-   begin
-      Job_Entry.Job  := Ds;
-      Job_Entry.Next := Job_List;
-      Job_List       := Job_Entry;
-   end Insert_Job;
+   procedure Init;
+   -- initializes the application,
+   -- it is normally only used internally. 
+   -- it is called via an uplink, that is initialized in the application body,
+   -- from the finrod library
    
-   
-   procedure Delete_Job (Ds : Job_Proc_P_Type)
-   is
-      procedure Free is
-	 new Ada.Unchecked_Deallocation(Job_Entry_Type, Job_Entry_P_Type);
-      Job      : Job_Entry_P_Type := Job_List;
-      Prev_Job : Job_Entry_P_Type;
-   begin
-      while Job /= null and then Job.Job /= Ds loop
-	 Prev_Job := Job;
-	 Job      := Job.Next;
-      end loop;
-      if Job /= null then
-	 Prev_Job.Next := Job.Next;
-	 Free (Job);
-      else
-	 null;-----------------------------------error------------------
-	 -- either dont know this job or last job in the queue
-      end if;
-   end Delete_Job;
-   
-   
-   procedure Scan
-   is
-      Job : Job_Entry_P_Type;
-   begin
-      loop
-	 Timer.Start_Timer;
-	 Job := Job_List;
-	 while Job /= null loop
-	    Job.Job.all;
-	    Job := Job.Next;
-	 end loop;
-	 Timer.Stop_Timer;
-      end loop; -- this hangs when no job;
-   end Scan;
-   
-   
-end Finrod.Thread;
+end Board1_App;

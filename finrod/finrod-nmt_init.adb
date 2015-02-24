@@ -65,7 +65,7 @@ package body Finrod.Nmt_Init is
 	    -- board.set_ip_address         -- if special
 	    
 	    -- reads the hw id and applies it to the net addresses
-	    Finrod.Board.Set_Id; 
+	    Finrod.Board.Set_Id (1); 
 	    -- reads the hw id and applies it to the net addresses
 	    
 	    -- board.set_master_ip_address  -- if special
