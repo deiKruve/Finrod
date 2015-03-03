@@ -43,7 +43,8 @@ with Last_Chance_Handler;  pragma Unreferenced (Last_Chance_Handler);
 with Timer;  pragma Unreferenced (Timer);
 -- until we have used it
 
---with system;
+with System;
+
 procedure Demo is
    pragma Priority (System.Priority'First);
 begin

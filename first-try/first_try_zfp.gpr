@@ -1,0 +1,35 @@
+project First_Try_Zfp is
+
+   for Languages use ("Ada");
+
+   for Main use ("main");
+   for Source_Dirs use ("src", "system", "../stm32f-definitions");
+   for Object_Dir use "obj";
+
+   package Compiler is
+      -- for assembly code -- for Default_Switches ("ada") use ("-S", "-g", "-gnatwa", "-gnatQ", "-gnat12");
+      for Default_Switches ("ada") use ("-g", "-gnatwa", "-gnatQ", "-gnat12");
+   end Compiler;
+
+   package Builder is
+      for Default_Switches ("ada") use 
+        ("-g", 
+         "--RTS=/usr/gnat-arm/lib/gcc/arm-eabi/4.7.4/rts-zfp");
+--          "--RTS=/usr/gnat-arm/lib/gnat/arm-eabi/ravenscar-sfp-stm32f4");
+--          "--RTS=/GNATPRO/7.2.1/lib/gnat/arm-eabi/ravenscar-sfp-stm32f4");
+   end Builder;
+   package Linker is
+      for Default_Switches ("ada") use 
+        ("obj/handler.o", "obj/start-rom.o");
+   end Linker;
+
+   package Ide is
+      for Gnat use "arm-eabi-gnat";
+      for Gnatlist use "arm-eabi-gnatls";
+      for Debugger_Command use "arm-eabi-gdb";
+      for Program_Host use "localhost:4242";
+      for Communication_Protocol use "remote";
+   end Ide;
+
+end First_Try_Zfp;
+

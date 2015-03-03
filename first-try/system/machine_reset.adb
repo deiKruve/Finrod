@@ -1,8 +1,12 @@
 ------------------------------------------------------------------------------
 --                                                                          --
---                             GNAT EXAMPLE                                 --
+--                         GNAT RUN-TIME COMPONENTS                         --
 --                                                                          --
---             Copyright (C) 2014, Free Software Foundation, Inc.           --
+--                   S Y S T E M .  M A C H I N E _ R E S E T               --
+--                                                                          --
+--                                 B o d y                                  --
+--                                                                          --
+--            Copyright (C) 2011-2013, Free Software Foundation, Inc.       --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -25,29 +29,59 @@
 --                                                                          --
 ------------------------------------------------------------------------------
 
---  The file declares the main procedure for the demonstration.
+with System;
+with Ada.Unchecked_Conversion;
 
---pragma Restrictions (Max_tasks => 1);
+package body Machine_Reset is
+   procedure Os_Exit (Status : Integer);
+   pragma No_Return (Os_Exit);
+   pragma Export (Ada, Os_Exit, "exit");
+   --  Shutdown or restart the board
 
-with Mainloop;               pragma Unreferenced (Mainloop);
---  The Driver package contains the task that actually controls the app so
---  although it is not referenced directly in the main procedure, we need it
---  in the closure of the context clauses so that it will be included in the
---  executable.
+   procedure Os_Abort;
+   pragma No_Return (Os_Abort);
+   pragma Export (Ada, Os_Abort, "abort");
+   --  Likewise
 
-with Last_Chance_Handler;  pragma Unreferenced (Last_Chance_Handler);
---  The "last chance handler" is the user-defined routine that is called when
---  an exception is propagated. We need it in the executable, therefore it
---  must be somewhere in the closure of the context clauses.
+   --------------
+   -- Os_Abort --
+   --------------
 
-with Timer;  pragma Unreferenced (Timer);
--- until we have used it
+   procedure Os_Abort is
+   begin
+      Os_Exit (1);
+   end Os_Abort;
 
---with system;
-procedure Demo is
-   pragma Priority (System.Priority'First);
-begin
-   loop
-      null;
-   end loop;
-end Demo;
+   -------------
+   -- Os_Exit --
+   -------------
+
+   procedure Os_Exit (Status : Integer) is
+      pragma Unreferenced (Status);
+      type Word is mod 2**32;
+      function Toa is new 
+     Ada.Unchecked_Conversion (Source => Word,
+			       Target => System.address);
+      
+      --  The parameter is just for ISO-C compatibility
+      --type Word is mod 2**32;
+      APINT : Word;
+      for APINT'Address use Toa (16#E000_ED0C#);
+      pragma Import (Ada, APINT);
+      pragma Volatile (APINT);
+   begin
+      APINT := 16#05FA_0004#;
+      loop
+         null;
+      end loop;
+   end Os_Exit;
+
+   ----------
+   -- Stop --
+   ----------
+
+   procedure Stop is
+   begin
+      Os_Exit (0);
+   end Stop;
+end Machine_Reset;

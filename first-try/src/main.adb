@@ -1,7 +1,18 @@
 
 --pragma Restrictions (Max_tasks => 1);
+--pragma restrictions (no_secondary_stack);
 pragma Warnings (Off, "*may call Last_Chance_Handler");
 pragma Warnings (Off, "*(No_Exception_Propagation) in effect");
+pragma Warnings (Off, "*is not referenced");
+
+with Machine_Reset;
+with Setup_Pll;
+with Last_Chance_Handler;
+with Memory_Compare;
+with Memory_Copy;
+with Memory_Move;
+with Memory_Set;
+with Secondary_Stack;
 
 with Init;
 with Sermon;
@@ -9,7 +20,7 @@ with Timer;
 
 --package body Mainloop is
 
-   procedure Mainloop --Tryit 
+   procedure Main --Tryit 
    is
       use type Sermon.Uart_Data_Type;
       First, M : Sermon.Srd_Index_Type;
@@ -82,5 +93,5 @@ with Timer;
 
 --begin
    --Tryit;
-end Mainloop;
+end Main;
 

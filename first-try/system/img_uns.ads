@@ -1,8 +1,12 @@
 ------------------------------------------------------------------------------
 --                                                                          --
---                             GNAT EXAMPLE                                 --
+--                         GNAT RUN-TIME COMPONENTS                         --
 --                                                                          --
---             Copyright (C) 2014, Free Software Foundation, Inc.           --
+--                       S Y S T E M . I M G _ U N S                        --
+--                                                                          --
+--                                 S p e c                                  --
+--                                                                          --
+--          Copyright (C) 1992-2014, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -25,29 +29,35 @@
 --                                                                          --
 ------------------------------------------------------------------------------
 
---  The file declares the main procedure for the demonstration.
+--  This package contains the routines for supporting the Image attribute for
+--  modular integer types up to size Unsigned'Size, and also for conversion
+--  operations required in Text_IO.Modular_IO for such types.
 
---pragma Restrictions (Max_tasks => 1);
+with System.Unsigned_Types;
 
-with Mainloop;               pragma Unreferenced (Mainloop);
---  The Driver package contains the task that actually controls the app so
---  although it is not referenced directly in the main procedure, we need it
---  in the closure of the context clauses so that it will be included in the
---  executable.
+package Img_Uns is
+   pragma Pure;
 
-with Last_Chance_Handler;  pragma Unreferenced (Last_Chance_Handler);
---  The "last chance handler" is the user-defined routine that is called when
---  an exception is propagated. We need it in the executable, therefore it
---  must be somewhere in the closure of the context clauses.
+   procedure Image
+     (V : System.Unsigned_Types.Unsigned;
+      S : in out String;
+      P : out Natural);
+   pragma Inline (Image);
+   --  Computes Unsigned'Image (V) and stores the result in S (1 .. P) setting
+   --  the resulting value of P. The caller guarantees that S is long enough to
+   --  hold the result, and that S'First is 1.
+   
+   function Image (V : System.Unsigned_Types.Unsigned) return String;
+   --  Computes Unsigned'Image (V) and stores the result in S
 
-with Timer;  pragma Unreferenced (Timer);
--- until we have used it
+   procedure Set_Image
+     (V : System.Unsigned_Types.Unsigned;
+      S : in out String;
+      P : in out Natural);
+   --  Stores the image of V in S starting at S (P + 1), P is updated to point
+   --  to the last character stored. The value stored is identical to the value
+   --  of Unsigned'Image (V) except that no leading space is stored. The caller
+   --  guarantees that S is long enough to hold the result. S need not have a
+   --  lower bound of 1.
 
---with system;
-procedure Demo is
-   pragma Priority (System.Priority'First);
-begin
-   loop
-      null;
-   end loop;
-end Demo;
+end Img_Uns;

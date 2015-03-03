@@ -7,9 +7,9 @@ with Init;
 with Sermon;
 with Timer;
 
---package body Mainloop is
+package body Mainloop is
 
-   procedure Mainloop --Tryit 
+   procedure Tryit 
    is
       use type Sermon.Uart_Data_Type;
       First, M : Sermon.Srd_Index_Type;
@@ -50,9 +50,9 @@ with Timer;
 	    elsif Sermon.Serial_Recd_Data_A.all (First .. First + 4) = 
 	      "rtime" then
 	       Sermon.Send_String 
-		 (timer.Image (Timer.Report_Min_Duration) & 
+		 (Timer.Time_Interval'Image (Timer.Report_Min_Duration) & 
 		    "   " & 
-		    Timer.Image (Timer.Report_Max_Duration) &
+		    Timer.Time_Interval'Image (Timer.Report_Max_Duration) &
 		    " clock ticks.");
 	       
 	    -- else echo the string
@@ -78,9 +78,9 @@ with Timer;
 	 
 	 Timer.Stop_Timer;--------------------------testing
       end loop;     
-   --end tryit;
+   end tryit;
 
---begin
-   --Tryit;
+begin
+   Tryit;
 end Mainloop;
 
