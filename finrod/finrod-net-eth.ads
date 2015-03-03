@@ -2,7 +2,7 @@
 --                                                                          --
 --                            FINROD COMPONENTS                             --
 --                                                                          --
---                            F I N R O D . N E T                           --
+--                       F I N R O D . N E T . E T H                        --
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
@@ -27,40 +27,62 @@
 --                                                                          --
 ------------------------------------------------------------------------------
 --
--- this is the top of the finrod ethernet interface
---
+-- this is the finrod ethernet mac interface
+-- 
 
-with Finrod.Net.Eth;
 
-package body Finrod.Net is
-   --package Eth renames  Finrod.Net.Eth; ---- automagic in ada
+--with System;
+--with STM32F4;
+
+package Finrod.Net.Eth is
    
+   --package Stm renames STM32F4;
+   
+   
+   ------------------------------
+   -- some types and constants --
+   ------------------------------
    
    ----------------------
-   --  interface       --
+   -- public interface --
    ----------------------
    
+   procedure Init_Ethernet;
+   -- builds the circus tent
+   
+    
+   function Poll_Received return Poll_R_Reply_Type;
    -- poll for a received frame and determine the type.
    -- stash any split 2nd halves
-   function Poll_Received return Poll_R_Reply_Type
-   is (Eth.Poll_Received);
    
-   
+   function Poll_Xmit_Completed return Poll_X_Reply_Type;
    -- since we have a strictly sequential comms pattern we
    -- check for completed or error.
    -- in case of error, normally there is a re-transmission 
    -- after the error has been cleared.
-   function Poll_Xmit_Completed return Poll_X_Reply_Type
-   is (Eth.Poll_Xmit_Completed);
    
    
-   -- execute the next stashed job, 
-   -- used in time syncing and ReqRep.
-   procedure Execute_Stashed
-   is
-   begin
-      null;
-   end Execute_Stashed;
+   -------------------------------
+   -- for the parent and        --  
+   -- uncles only               --
+   -------------------------------
+    
+   procedure Send_Frame (Ba : Frame_Address; Bbc : Frame_Length_Type);
+   -- to send a frame build it first then pass the address and the length
+   -- here for transmission.
+   -- the frame can ony be released once it has been successfully sent.
+   -- lets see if this works as a queueing mechanism.
    
-  
-end Finrod.Net;
+   procedure Stash_For_Sending (Ba : Frame_Address; Bbc : Frame_Length_Type);
+   -- queues a frame for sending,
+   -- it is meant as a stage2 repost action, which can be executed just now
+   
+   procedure Send_Next;
+   -- sends the next queued item. note that normally there should be
+   -- no more than 1 item on the stack.
+   -- so this command should happen after Stash_For_Sending without any
+   -- ethernet send activity in between.
+   -- use Poll_Xmit_Completed after this command to ascertain its gone.
+   
+   
+end Finrod.Net.Eth;

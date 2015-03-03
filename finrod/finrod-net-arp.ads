@@ -49,39 +49,7 @@ package Finrod.Net.Arp is
    Arp_Req   : constant Stm.Bits_16 := 1;        -- mode: 1 = request
    Arp_Rep   : constant Stm.Bits_16 := 2;        -- mode: 2 = reply
    
-   type Arp_Packet is new Frame with record
-      Dest    : Stm.Bits_48 := Mac_xmas; -- destination mac address, broadcast
-      Srce    : Stm.Bits_48 := Mac_null; -- sender i/f mac address
-      Proto   : Stm.Bits_16 := 16#0806#; -- eth protocol
-      Htype   : Stm.Bits_16 := 1;        -- Hardware type 
-      Ptype   : Stm.Bits_16 := 16#0800#; -- Protocol type
-      Hlen    : Stm.Byte    := 6;        -- Hardware address length
-      Plen    : Stm.Byte    := 4;        -- ip address length
-      Oper    : Stm.Bits_16 := 1;        -- mode: 1 = request, 2 = reply
-      Sha     : Stm.Bits_48 := Mac_null; -- sender i/f mac address
-      Spa     : Stm.Bits_32 := Ip_Null;  -- sender i/f ip address
-      Tha     : Stm.Bits_48 := Mac_null; -- target i/f mac address
-      Tpa     : Stm.Bits_32 := Ip_null;  -- tatget i/f ip address
-   end record;
-   
-   for Arp_Packet use record             -- note the start address at byte 4
-      Dest   at  4 range  0 .. 47;       -- this is to skip the tag.
-      Srce   at 10 range  0 .. 47;       -- I am sure this is not portable
-      Proto  at 16 range  0 .. 15;
-      Htype  at 18 range  0 .. 15;
-      Ptype  at 20 range  0 .. 15;
-      Hlen   at 22 range  0 ..  7;
-      Plen   at 23 range  0 ..  7;
-      Oper   at 24 range  0 .. 15;
-      Sha    at 26 range  0 .. 47;
-      Spa    at 32 range  0 .. 31;
-      Tha    at 36 range  0 .. 47;
-      Tpa    at 42 range  0 .. 31;
-   end record;
-   
-   for Arp_Packet'Bit_Order use System.High_Order_First;
-   for Arp_Packet'Scalar_Storage_Order use System.High_Order_First;
-   -- its Big Endian
+   type Arp_Packet is private;
    
    
    -------------------------
@@ -116,6 +84,44 @@ package Finrod.Net.Arp is
    procedure Display_Xmitted (Num : Positive := 1);
    -- for debugging.
    -- sends the content of the last transmitted frame to the spy.
+   
+private
+   
+   type Arp_Packet is new Frame with record
+      Dest    : Stm.Bits_48 := Mac_xmas; -- destination mac address, broadcast
+      Srce    : Stm.Bits_48 := Mac_null; -- sender i/f mac address
+      Proto   : Stm.Bits_16 := 16#0806#; -- eth protocol
+      Htype   : Stm.Bits_16 := 1;        -- Hardware type 
+      Ptype   : Stm.Bits_16 := 16#0800#; -- Protocol type
+      Hlen    : Stm.Byte    := 6;        -- Hardware address length
+      Plen    : Stm.Byte    := 4;        -- ip address length
+      Oper    : Stm.Bits_16 := 1;        -- mode: 1 = request, 2 = reply
+      Sha     : Stm.Bits_48 := Mac_null; -- sender i/f mac address
+      Spa     : Stm.Bits_32 := Ip_Null;  -- sender i/f ip address
+      Tha     : Stm.Bits_48 := Mac_null; -- target i/f mac address
+      Tpa     : Stm.Bits_32 := Ip_null;  -- tatget i/f ip address
+   end record;
+   
+   for Arp_Packet use record             -- note the start address at byte 4
+      Dest   at  4 range  0 .. 47;       -- this is to skip the tag.
+      Srce   at 10 range  0 .. 47;       -- I am sure this is not portable
+      Proto  at 16 range  0 .. 15;
+      Htype  at 18 range  0 .. 15;
+      Ptype  at 20 range  0 .. 15;
+      Hlen   at 22 range  0 ..  7;
+      Plen   at 23 range  0 ..  7;
+      Oper   at 24 range  0 .. 15;
+      Sha    at 26 range  0 .. 47;
+      Spa    at 32 range  0 .. 31;
+      Tha    at 36 range  0 .. 47;
+      Tpa    at 42 range  0 .. 31;
+   end record;
+   
+   for Arp_Packet'Bit_Order use System.High_Order_First;
+   for Arp_Packet'Scalar_Storage_Order use System.High_Order_First;
+   -- its Big Endian
+   
+  
    
 end Finrod.Net.Arp;
 

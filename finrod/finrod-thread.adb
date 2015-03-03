@@ -37,30 +37,59 @@ with Finrod.Timer;
 package body Finrod.Thread is
    package Timer renames Finrod.Timer;
    
+   --------------------------------
+   -- constants,                 --
+   -- definitions and local vars --
+   --------------------------------
+   
+   
+   -- This is Just The Root Pointer, once the first item is added
+   -- it will be a null terminated list.
+   Free_List : Job_Entry_P_Type := null; 
+   
+   
+   ----------------------
+   -- public interface --
+   ----------------------
+   
+   -- add some routine on the stack
+   -- for executing after the present load is completed
    procedure Insert_Job (Ds : Job_Proc_P_Type)
    is
-      Job_Entry : constant Job_Entry_P_Type := new Job_Entry_Type;
+      Job_Entry : Job_Entry_P_Type;
    begin
+      -- check for reusable structs
+      if Free_List /= null then
+	 Job_Entry := Free_List;
+	 Free_List := Free_List.Next;
+      else
+	 Job_Entry := new Job_Entry_Type;
+      end if;
+      
+      -- link it into the job chain
       Job_Entry.Job  := Ds;
       Job_Entry.Next := Job_List;
       Job_List       := Job_Entry;
    end Insert_Job;
    
    
+   -- delete a job (like in the case of a routine with a loop)
    procedure Delete_Job (Ds : Job_Proc_P_Type)
    is
-      procedure Free is
-	 new Ada.Unchecked_Deallocation(Job_Entry_Type, Job_Entry_P_Type);
-      Job      : Job_Entry_P_Type := Job_List;
-      Prev_Job : Job_Entry_P_Type;
+      Job_Entry : Job_Entry_P_Type := Job_List;
+      Prev_Job  : Job_Entry_P_Type;
    begin
-      while Job /= null and then Job.Job /= Ds loop
-	 Prev_Job := Job;
-	 Job      := Job.Next;
+      while Job_Entry /= null and then Job_Entry.Job /= Ds loop
+	 Prev_Job  := Job_Entry;
+	 Job_Entry := Job_Entry.Next;
       end loop;
-      if Job /= null then
-	 Prev_Job.Next := Job.Next;
-	 Free (Job);
+      if Job_Entry /= null then
+	 -- take it out of the job chain
+	 Prev_Job.Next := Job_Entry.Next;
+	 -- and link it into the free chain
+	 --Job_Entry.Job := null; snotallowed! so it MUST be overwritten
+	 Job_Entry.Next := Free_List;
+	 Free_List := Job_Entry;
       else
 	 null;-----------------------------------error------------------
 	 -- either dont know this job or last job in the queue
@@ -68,18 +97,19 @@ package body Finrod.Thread is
    end Delete_Job;
    
    
+   -- start executing the job stack
    procedure Scan
    is
-      Job : Job_Entry_P_Type;
+      Job_Entry : Job_Entry_P_Type;
    begin
       loop
-	 Timer.Start_Timer;
-	 Job := Job_List;
-	 while Job /= null loop
-	    Job.Job.all;
-	    Job := Job.Next;
+	 Timer.Start_Timer;---------------------------
+	 Job_Entry    := Job_List;
+	 while Job_Entry /= null loop
+	    Job_Entry.Job.all;
+	    Job_Entry := Job_Entry.Next;
 	 end loop;
-	 Timer.Stop_Timer;
+	 Timer.Stop_Timer;-----------------------------
       end loop; -- this hangs when no job;
    end Scan;
    
