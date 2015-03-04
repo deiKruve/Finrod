@@ -52,6 +52,9 @@ package Finrod.Net is
    type Frame is tagged record   -- the root of all ethernet frames
       null;
    end record;
+   for Frame'Bit_Order use System.High_Order_First;
+   for Frame'Scalar_Storage_Order use System.High_Order_First;
+   -- its Big Endian
    
    subtype Frame_Address is System.Address; 
    -- note that frame addresses must skip the first 4 bytes of a record
@@ -87,14 +90,11 @@ package Finrod.Net is
    -- public interface --
    ----------------------
    
-   procedure Init_Ethernet;
-   -- builds the circus tent
-   
-   function Poll_Received return Poll_R_Reply_Type;
+   function Poll_Received return Poll_R_Reply_Type with Inline;
    -- poll for a received frame and determine the type.
    -- stash any split 2nd halves
    
-   function Poll_Xmit_Completed return Poll_X_Reply_Type;
+   function Poll_Xmit_Completed return Poll_X_Reply_Type with Inline;
    -- since we have a strictly sequential comms pattern we
    -- check for completed or error.
    -- in case of error, normally there is a re-transmission 
@@ -103,29 +103,6 @@ package Finrod.Net is
    procedure Execute_Stashed;
    -- execute the next stashed job, 
    -- used in time syncing and ReqRep.
-   
-   
-   -------------------------------
-   -- for the children only     --
-   -- could this be in private? --
-   -------------------------------
-   
-   procedure Send_Frame (Ba : Frame_Address; Bbc : Frame_Length_Type);
-   -- to send a frame build it first then pass the address and the length
-   -- here for transmission.
-   -- the frame can ony be released once it has been successfully sent.
-   -- lets see if this works as a queueing mechanism.
-   
-   procedure Stash_For_Sending (Ba : Frame_Address; Bbc : Frame_Length_Type);
-   -- queues a frame for sending,
-   -- it is meant as a stage2 repost action, which can be executed just now
-   
-   procedure Send_Next;
-   -- sends the next queued item. note that normally there should be
-   -- no more than 1 item on the stack.
-   -- so this command should happen after Stash_For_Sending without any
-   -- ethernet send activity in between.
-   -- use Poll_Xmit_Completed after this command to ascertain its gone.
    
 private
    --  type Frame is tagged record 
