@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<Locations >
+  <Project >
+    <file_marker column=" 1" line=" 31" >
+      <vfs_file>/usr/gnat/lib/gcc/x86_64-pc-linux-gnu/4.7.4/rts-native/adainclude/s-secsta.adb</vfs_file>
+    </file_marker>
+    <file_marker column=" 1" line=" 1" >
+      <vfs_file />
+    </file_marker>
+    <file_marker current="true" column=" 1" line=" 1" >
+      <vfs_file>/home/jan/MMS/programs-STM/rts/common/a-unccon.ads</vfs_file>
+    </file_marker>
+  </Project>
+</Locations>
