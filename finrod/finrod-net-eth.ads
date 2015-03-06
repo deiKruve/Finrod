@@ -85,4 +85,13 @@ package Finrod.Net.Eth is
    -- use Poll_Xmit_Completed after this command to ascertain its gone.
    
    
+   -------------------
+   -- debugger      --
+   -------------------
+   type On_Off_Type is (Off, On);
+   
+   procedure Set_Mac_Loopback_Mode (B : On_Off_Type);
+   -- sets the mac loopback mode on or off
+   
+   
 end Finrod.Net.Eth;

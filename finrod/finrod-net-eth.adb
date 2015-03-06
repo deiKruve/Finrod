@@ -32,15 +32,23 @@
 
 with System.Storage_Elements;
 with Ada.Unchecked_Conversion;
+with Interfaces;
 
 with STM32F4.o7xx.Ethbuf;
+with STM32F4.o7xx.Eth;
 with STM32F4.o7xx.Registers;
+
+with Finrod.Board;
 
 package body Finrod.Net.Eth is
    
    package Sto  renames  System.Storage_Elements;
+   package Ifce renames  Interfaces;
+   package Stm  renames  STM32F4;
    package Ebuf renames  STM32F4.o7xx.Ethbuf;
+   package Eth  renames  STM32F4.o7xx.Eth;
    package R    renames  STM32F4.o7xx.Registers;
+   
       
    ------------------------------
    -- some types and constants --
@@ -74,6 +82,63 @@ package body Finrod.Net.Eth is
    Tx_Desc_1 : Ebuf.Xl_Xmit_Desc_Type;
    Tx_Desc_2 : Ebuf.Xl_Xmit_Desc_Type;
    Tx_Desc_3 : Ebuf.Xl_Xmit_Desc_Type;
+  
+   
+   ---------------------
+   --  local helpers  --
+   ---------------------
+   
+   -- PHY wite routine
+   procedure Phy_Write (pAddr : Stm.Bits_5; 
+			MReg  : Stm.Bits_5; 
+			Clk   : Stm.Bits_3; 
+			Data  : Stm.Bits_16)
+   is
+      use type Stm.Bits_1;
+      MACMIIAR_Tmp : Eth.MACMIIAR_Register := R.Eth_Mac.MACMIIAR;
+      MACMIIDR_Tmp : Eth.MACMIIDR_Register := R.Eth_Mac.MACMIIDR;
+   begin
+      MACMIIDR_Tmp.MD    := Data;
+      R.Eth_Mac.MACMIIDR := MACMIIDR_Tmp;
+      -- wait for PHY available
+      while MACMIIAR_Tmp.Mb /= Eth.Clear loop
+	 MACMIIAR_Tmp    := R.Eth_Mac.MACMIIAR;
+      end loop;
+      MACMIIAR_Tmp.Pa    := Paddr;
+      MACMIIAR_Tmp.Mr    := Mreg;
+      MACMIIAR_Tmp.Cr    := Clk;
+      MACMIIAR_Tmp.Mw    := Eth.Write;
+      MACMIIAR_Tmp.Mb    := Eth.Busy;
+      R.Eth_Mac.MACMIIAR := MACMIIAR_Tmp;
+   end Phy_Write;
+   
+   
+   -- PHY read routine
+   function Phy_Read (pAddr : Stm.Bits_5; 
+		      MReg  : Stm.Bits_5; 
+		      Clk   : Stm.Bits_3)
+		     return Stm.Bits_16
+   is
+      use type Stm.Bits_1;
+      MACMIIAR_Tmp : Eth.MACMIIAR_Register := R.Eth_Mac.MACMIIAR;
+   begin
+      -- wait for PHY available
+      while MACMIIAR_Tmp.Mb /= Eth.Clear loop
+	 MACMIIAR_Tmp    := R.Eth_Mac.MACMIIAR;
+      end loop;
+      MACMIIAR_Tmp.Pa    := Paddr;
+      MACMIIAR_Tmp.Mr    := Mreg;
+      MACMIIAR_Tmp.Cr    := Clk;
+      MACMIIAR_Tmp.Mw    := Eth.Read;
+      MACMIIAR_Tmp.Mb    := Eth.Busy;
+      R.Eth_Mac.MACMIIAR := MACMIIAR_Tmp;
+      -- wait for PHY done
+      while MACMIIAR_Tmp.Mb /= Eth.Clear loop
+	 MACMIIAR_Tmp    := R.Eth_Mac.MACMIIAR;
+      end loop;
+      return R.Eth_Mac.MACMIIDR.Md;
+   end Phy_Read;
+ 
    
    ----------------------
    -- public interface --
@@ -175,15 +240,106 @@ package body Finrod.Net.Eth is
       Tx_Desc_3.Tdes2.Tbap1 := Tob (Buf4'Address); -- for the time being!!!!!
       
       Tx_Desc_3.Tdes3.Tbap2 := Tob (Tx_Desc_1'Address);
-      
-      -- next section
-      declare 
-	 
+      ---------------------------------------------------
+      -- next section, do a warm dma reset incase this was a warm init.
+      declare
+	 use type Stm.Bits_1;
+	 Dmabmr_Tmp : Eth.DMABMR_Register := R.Eth_Mac.DMABMR;
       begin
+	 Dmabmr_Tmp.SR := Eth.Reset;
+	 R.Eth_Mac.DMABMR := Dmabmr_Tmp;
+	 while Dmabmr_Tmp.SR /= Eth.Off loop
+	    Dmabmr_Tmp := R.Eth_Mac.DMABMR;
+	 end loop;
+      end;
+      
+      -- next Set the 1st MAC address
+      declare 
+	 use type Stm.Bits_48;
+	 use type Ifce.Unsigned_64;
+	 MACA0HR_Tmp : Eth.MACA0HR_Register := R.Eth_Mac.MACA0HR;
+	 Address  : Ifce.Unsigned_64  := Ifce.Unsigned_64 (Board.Get_Mac_Address);
+      begin
+	 R.Eth_Mac.MACA0LR  := Stm.Bits_32 (Address);
+	 MACA0HR_Tmp.MACA0H := Stm.Bits_16 (Ifce.Shift_Right (Address, 32));
+	 MACA0HR_Tmp.Mo     := 1;
+	 R.Eth_Mac.MACA0HR  := MACA0HR_Tmp;
+      end;
+      
+      -- set broadcast address
+      declare 
+	 use type Stm.Bits_6;
+	 use type Stm.Bits_48;
+	 use type Ifce.Unsigned_64;
+	 MACA1HR_Tmp : Eth.MACA1HR_Register := R.Eth_Mac.MACA1HR;
+	 Address  : Ifce.Unsigned_64  := Ifce.Unsigned_64 (Board.Get_Bcast_Address);
+      begin
+	 R.Eth_Mac.MACA1LR  := Stm.Bits_32 (Address);
+	 MACA1HR_Tmp.MACA1H := Stm.Bits_16 (Ifce.Shift_Right (Address, 32));
+	 MACA1HR_Tmp.Ae     := Eth.Enabled;
+	 MACA1HR_Tmp.Sa     := Eth.Maca_Da;
+	 MACA1HR_Tmp.Mbc    := Eth.Lsbyte + Eth.Byte2;
+	 R.Eth_Mac.MACA1HR  := MACA1HR_Tmp;
+      end;
+      
+      -- lets do the mac frame filter register first
+      declare
+	 MACFFR_Tmp : Eth.MACFFR_Register := R.Eth_Mac.MACFFR;
+      begin
+	 MACFFR_Tmp.RA    := Eth.Off; -- Receive all
+	 MACFFR_Tmp.HPF   := Eth.Either; -- Hash or perfect filter
+	 MACFFR_Tmp.SAF   := Eth.Off; -- Source address filter enable
+	 MACFFR_Tmp.SAIF  := Eth.Off; 
+	 MACFFR_Tmp.PCF   := Eth.PCF_BlockAll;
+	 MACFFR_Tmp.BFD   := Eth.Pass_Allb; -- Broadcast frame disable
+	 MACFFR_Tmp.PAM   := Eth.Pass_Allm; -- Pass all mutlicast
+	 MACFFR_Tmp.DAIF  := Eth.Off; 
+	 MACFFR_Tmp.HM    := Eth.Normal; -- Hash multicast
+	 MACFFR_Tmp.HU    := Eth.Normal; -- Hash unicast
+	 MACFFR_Tmp.PM    := Eth.Off;    -- Promiscuous mode
+	 R.Eth_Mac.MACFFR := MACFFR_Tmp;
+      end;
+      
+      -- get the PHY going
+      declare
+	 Phy_Addr   : Stm.Bits_5 := Board.Get_PHY_Address;
+	 Phy_Mspeed : Stm.Bits_3 := Board.Get_PHY_Mspeed;
+      begin
+	 Phy_Write (PAddr => Phy_Addr,
+		    MReg  => 0;
+		    Clk   => Phy_Mspeed;
+		    Data  => 16#8_000#; -- reset
+		    
+      
+      -- mac control register
+      declare
+	 MACCR_Tmp : Eth.MACCR_Register := R.Eth_Mac.MACCR;
+      begin
+	 MACCR_Tmp.CSTF  := Eth.Strip_Crc;
+	 MACCR_Tmp.Wd    := Eth.Disable_WD;------------------
+	 MACCR_Tmp.JD    := Eth.Disable_Jt;------------------
+	 MACCR_Tmp.IFG   := Eth.IFG_96Bit;
+	 MACCR_Tmp.CSD   := Eth.Cs_Disable; -- check for RMII-----------
+	 MACCR_Tmp.FES   := Eth.Mb_100;
+	 MACCR_Tmp.ROD   := Eth.Ro_Disable;
+	 MACCR_Tmp.LM    := Eth.Off; -- loopback off
+	 MACCR_Tmp.DM    := Eth.Off; -- duplex mode off
+	 MACCR_Tmp.IPCO  := Eth.Enabled; -- ip checksum offload on
+	 MACCR_Tmp.RD    := Eth.Retr_Disabled; -- gives an error after 1 collision
+	 -- this when working, and when starting up????----------------------
+	 MACCR_Tmp.APCS  := Eth.On; -- Automatic Pad/CRC stripping
+	 MACCR_Tmp.Bl    := Eth.BL_10; -- back off time when collision.
+	 MACCR_Tmp.DC    := Eth.On; -- deferral check max and give error.
+	 R.Eth_Mac.MACCR := MACCR_Tmp;
+	 
+	 -- and we are not done yet, everything is still off.
 	 
       end;
-	
+      
+      
    end Init_Ethernet;
+   
+
    
    
    -- poll for a received frame and determine the type.
@@ -237,5 +393,16 @@ package body Finrod.Net.Eth is
       null;
    end Send_Frame;
       
-      
+   ---------------------
+   -- debug interface --
+   ---------------------
+   
+   -- sets the mac loopback mode on or off
+   procedure Set_Mac_Loopback_Mode (B : On_Off_Type)
+   is
+   begin
+      null;
+   end Set_Mac_Loopback_Mode;
+   
+
 end Finrod.Net.Eth;

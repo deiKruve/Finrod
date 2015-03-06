@@ -74,6 +74,15 @@ package Finrod.Board is
    -- returns the ip address of the bus master,
    -- hope this can stay here
    
+   function Get_Bcast_Address return Mac_Address with Inline;
+   -- returns the system-lan's broadcast address;
+   
+   function Get_PHY_Address return Stm.Bits_3 with Inline;
+   -- returns the harware PHY address;
+   
+   function Get_PHY_Mspeed return STM32F4.o7xx.Eth.CR_Div102 with Inline;
+   --  returns the PHY service bus speed;
+   
    procedure Set_Id (Id : Board_Id) with Inline;
    -- sets the board id and incorporates it into the net addresses
    -- as explained above.
@@ -105,5 +114,19 @@ private
    -- the Ip Address of the master node
    -- must also be set by the application if change is needed
    
+   Broadcast_Mac_Address : Stm32F4.Bits_48  := 16#03_00_00_00_00_00#;
+   
+   
+   -------------------------------------------------------------
+   --  below are some constants for Olimex stm32-e407 boards  --
+   --  They should not need changing                          --
+   -------------------------------------------------------------
+   
+   PHY_Address : constant Stm32F4.Bits_5    := 0;
+   -- harware PHY address as strapped on the Olimex board;
+   
+   PHY_mSpeed   : constant STM32F4.o7xx.Eth  := STM32F4.o7xx.Eth.CR_Div102;
+   --  PHY mdio clock. 
+   --  change this when your board runs at a different HCK from 168MHz
    
 end Finrod.Board;

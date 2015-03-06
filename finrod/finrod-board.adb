@@ -97,90 +97,237 @@ package body Finrod.Board is
   
   -- inits the pins and then calls any other init functions --
   -- that might be needed                                   --
-  procedure Init_Pins
-  is
-     PMC_Tmp      : Scfg.PMC_Register   := R.Syscfg.PMC;
-     Ahb1en_Tmp   : Rcc.AHB1EN_Register := R.Rcc.AHB1ENR;
-     Apb2en_Tmp   : Rcc.APB2EN_Register := R.Rcc.APB2ENR;
-     
-     aModer_tmp   : Stm.Bits_16x2       := R.GPIOa.Moder;
-     aOspeedr_Tmp : Stm.Bits_16x2       := R.GPIOa.Ospeedr;
-     aOtyper_Tmp  : Stm.Bits_16x1       := R.GPIOa.Otyper;
-     aPupdr_Tmp   : Stm.Bits_16x2       := R.GPIOa.Pupdr;
-     aAfrl_Tmp    : Gpio.Afrl_Register  := R.GPIOa.Afrl;
-     
-     cModer_tmp   : Stm.Bits_16x2       := R.GPIOc.Moder;
-     cOspeedr_Tmp : Stm.Bits_16x2       := R.GPIOc.Ospeedr;
-     cOtyper_Tmp  : Stm.Bits_16x1       := R.GPIOc.Otyper;
-     cPupdr_Tmp   : Stm.Bits_16x2       := R.GPIOc.Pupdr;
-     cAfrl_Tmp    : Gpio.Afrl_Register  := R.GPIOc.Afrl;
-     
-     gModer_tmp   : Stm.Bits_16x2       := R.GPIOg.Moder;
-     gOspeedr_Tmp : Stm.Bits_16x2       := R.GPIOg.Ospeedr;
-     gOtyper_Tmp  : Stm.Bits_16x1       := R.GPIOg.Otyper;
-     gPupdr_Tmp   : Stm.Bits_16x2       := R.GPIOg.Pupdr;
-     gAfrl_Tmp    : Gpio.Afrl_Register  := R.GPIOg.Afrl;
-     
-     bModer_Tmp   : Stm.Bits_16x2       := R.GPIOB.MODER;
-     bOspeedr_Tmp : Stm.Bits_16x2       := R.GPIOB.Ospeedr;
-     bOtyper_Tmp  : Stm.Bits_16x1       := R.GPIOB.Otyper;
-     bPupdr_Tmp   : Stm.Bits_16x2       := R.GPIOB.Pupdr;
-     bAfrl_Tmp    : Gpio.Afrl_Register  := R.GPIOB.Afrl;
-  begin
-     -- before all else select the eth media interface
-     PMC_Tmp.MII_RMII_SEL := Scfg.RMII;  -- reduced interface on Olimex
-     -- write it
-     R.Syscfg.PMC         := PMC_Tmp;
-     
-     -- start some clocks.
-     -- uart first
-     Ahb1en_Tmp.Gpiob     := Rcc.Enable;  -- for uart1 pins
-     Ahb1en_Tmp.Dma2      := Rcc.Enable;  -- for uart1 dma
-     
-     -- then ethernet
-     Ahb1en_Tmp.GPIOA     := Rcc.Enable;  -- for eth_rmii interface pins
-     Ahb1en_Tmp.GPIOC     := Rcc.Enable;  -- for eth_rmii interface pins
-     Ahb1en_Tmp.GPIOG     := Rcc.Enable;  -- for eth_rmii interface pins
-     Ahb1en_Tmp.ETHMAC    := Rcc.Enable;  -- mac clock
-     Ahb1en_Tmp.ETHMACRX  := Rcc.Enable;  -- receive clock
-     Ahb1en_Tmp.ETHMACTX  := Rcc.Enable;  -- transmit clock
-     
-     -- and I am sure we need this
-     Ahb1en_Tmp.ETHMACPTP := Rcc.Enable;  -- the ptp clock
-     
-     -- lastly write it
-     R.Rcc.AHB1ENR        := Ahb1en_Tmp;
-     
-     -- enable uart1
-     Apb2en_Tmp.Uart1     := Rcc.Enable;
-     R.Rcc.APB2ENR        := Apb2en_Tmp;
-     
-     -- set up eth_rmii interface pins
-     Amoder_Tmp (1 ..3, 7) := (others => Gpio.Alt_Func);
-     R.Gpioa.Moder         := Amoder_Tmp;
-     
-     
-     aAfrl_Tmp (1 ..3, 7) := (others => Gpio.Af11);
-     R.Gpioa.Afrl         := AAfrl_Tmp;
-     
-     -- set up uart1 pins to gpio.port B pins 6 and 7.
-     bModer_Tmp (6 .. 7)   := (others => Gpio.Alt_Func);
-     R.GPIOB.MODER         := bModer_Tmp;
-     bOspeedr_Tmp (6 .. 7) := (others => Gpio.Speed_50MHz);
-     R.GPIOB.Ospeedr       := bOspeedr_Tmp;
-     bOtyper_Tmp (6 .. 7)  := (others => Gpio.Push_Pull);
-     R.GPIOB.Otyper        := bOtyper_Tmp;
-     bPupdr_Tmp (6 .. 7)   := (others => Gpio.Pull_Up);
-     R.GPIOB.Pupdr         := bPupdr_Tmp;
-     bAfrl_Tmp (6 .. 7)    := (others => Gpio.Af7);
-     R.GPIOB.Afrl          := bAfrl_Tmp;
-     
-     -- init the usart and its dma:
-     Finrod.Sermon.Init_Usart1;
-     --,init the ethernet with dma and ptp
-     Finrod.Net.Eth.Init_Ethernet;
-  end Init_Pins;
-  
+   procedure Init_Pins
+   is
+   begin
+      --  RCC reset registers
+      declare
+	 Ahb1rst_Tmp  : Rcc.AHB1RST_Register := R.Rcc.AHB1RSTR;
+	 --Apb1rst_Tmp  : Rcc.APB1RST_Register := R.Rcc.APB1RSTR;
+	 Apb2rst_Tmp  : Rcc.APB2RST_Register := R.Rcc.APB2RSTR;
+      begin
+	 Ahb1rst_Tmp.ETHMAC   := Rcc.Reset;
+	 Ahb1rst_Tmp.DMA1     := Rcc.Reset;
+	 Ahb1rst_Tmp.DMA2     := Rcc.Reset;
+	 Ahb1rst_Tmp.GPIOA    := Rcc.Reset;
+	 Ahb1rst_Tmp.GPIOB    := Rcc.Reset;
+	 Ahb1rst_Tmp.GPIOC    := Rcc.Reset;
+	 Ahb1rst_Tmp.GPIOG    := Rcc.Reset;
+	 --Apb1rst_Tmp.
+	 Apb2rst_Tmp.Uart1    := Rcc.Reset; -- reset the discovery channel
+	 Apb2rst_Tmp.Uart6    := Rcc.Reset;
+	 -- write to hardware
+	 R.Rcc.AHB1RSTR       := Ahb1rst_Tmp;
+	 --R.Rcc.APB1RST        := APB1RST_Tmp;
+	 R.Rcc.APB2RSTR       := Apb2rst_Tmp;
+      end;
+      
+      --  Syscfg registers
+      declare
+	 PMC_Tmp      : Scfg.PMC_Register   := R.Syscfg.PMC;
+      begin
+	 -- before all else select the eth media interface
+	 -- reduced interface on Olimex
+	 PMC_Tmp.MII_RMII_SEL    := Scfg.RMII;
+	 -- write to hardware
+	 R.Syscfg.PMC            := PMC_Tmp;
+      end;
+      
+      --  RCC enable registers
+      declare
+	 Ahb1en_Tmp   : Rcc.AHB1EN_Register  := R.Rcc.AHB1ENR;
+	 Apb2en_Tmp   : Rcc.APB2EN_Register  := R.Rcc.APB2ENR;
+      begin
+	 ---------------------------------
+	 -- start some clocks.
+	 -- uart first
+	 Ahb1en_Tmp.Gpiob     := Rcc.Enable;  -- for uart1 pins
+	 Ahb1en_Tmp.Dma2      := Rcc.Enable;  -- for uart1 dma
+	 -- then ethernet
+	 Ahb1en_Tmp.GPIOA     := Rcc.Enable;  -- for eth_rmii interface pins
+	 Ahb1en_Tmp.GPIOB     := Rcc.Enable;  -- 
+	 Ahb1en_Tmp.GPIOC     := Rcc.Enable;  -- for eth_rmii interface pins
+	 Ahb1en_Tmp.GPIOG     := Rcc.Enable;  -- for eth_rmii interface pins
+	 Ahb1en_Tmp.ETHMAC    := Rcc.Enable;  -- mac clock
+	 Ahb1en_Tmp.ETHMACRX  := Rcc.Enable;  -- receive clock
+	 Ahb1en_Tmp.ETHMACTX  := Rcc.Enable;  -- transmit clock
+	 -- and I am sure we need this
+	 Ahb1en_Tmp.ETHMACPTP := Rcc.Enable;  -- the ptp clock
+	 -- enable uart1 -- this is the discovery animal we use uart6
+	 -- Apb2en_Tmp.Uart1     := Rcc.Enable;
+	 Apb2en_Tmp.Uart6     := Rcc.Enable;
+	 -- write to hardware
+	 R.Rcc.AHB1ENR        := Ahb1en_Tmp;
+	 R.Rcc.APB2ENR        := Apb2en_Tmp;
+      end;
+      
+      --  GPIOA registers
+      declare
+	 aModer_tmp   : Stm.Bits_16x2       := R.GPIOa.Moder;
+	 aOspeedr_Tmp : Stm.Bits_16x2       := R.GPIOa.Ospeedr;
+	 aOtyper_Tmp  : Stm.Bits_16x1       := R.GPIOa.Otyper;
+	 aPupdr_Tmp   : Stm.Bits_16x2       := R.GPIOa.Pupdr;
+	 aAfrl_Tmp    : Gpio.Afrl_Register  := R.GPIOa.Afrl;
+      begin
+	 --  do not use
+	 --  PA0 is wake-up button
+	 --  PA8 is on USB power signal
+	 --  PA9, 10, 11, 12 are on USB_OTG1 (could perhaps be used)
+	 --  PA13, 14, 15 are on jtag
+	 ------------------------------------
+	 -- set up eth_rmii interface pins
+	 --
+	 -- PA1  -- REF_CLK, 50 MHz Reference Clock, in
+	 -- PA2  -- MDIO Management data I/O line
+	 -- PA3  -- interrupt from PHY, not part of the rmii, in
+	 -- PA7  -- Carrier Sense (CRS)/RX_Data Valid(RX_DV), in
+	 Amoder_Tmp (1 ..2)    := (others => Gpio.Alt_Func);
+	 Amoder_Tmp (7)        := Gpio.Alt_Func;
+	 aOspeedr_Tmp (2)      := Gpio.Speed_50MHz;
+	 aPupdr_Tmp (1)        := Gpio.Pull_Up;
+	 aOtyper_Tmp (2)       := Gpio.Push_Pull;
+	 aAfrl_Tmp (1 ..2)     := (others => Gpio.Af11);
+	 aAfrl_Tmp (7)         := Gpio.Af11;
+	 -- write to hardware
+	 R.Gpioa.Moder         := Amoder_Tmp;
+	 R.Gpioa.Ospeedr       := AOspeedr_Tmp;
+	 R.Gpioa.Pupdr         := APupdr_Tmp;
+	 R.Gpioa.Otyper        := AOtyper_Tmp;
+	 R.Gpioa.Afrl          := AAfrl_Tmp;
+      end;
+      
+      --  GPIOB registers
+      --  declare
+      --  	 bModer_Tmp   : Stm.Bits_16x2       := R.GPIOB.MODER;
+      --  	 bOspeedr_Tmp : Stm.Bits_16x2       := R.GPIOB.Ospeedr;
+      --  	 bOtyper_Tmp  : Stm.Bits_16x1       := R.GPIOB.Otyper;
+      --  	 bPupdr_Tmp   : Stm.Bits_16x2       := R.GPIOB.Pupdr;
+      --  	 bAfrl_Tmp    : Gpio.Afrl_Register  := R.GPIOB.Afrl;
+      --  begin
+      --  	 --  do not use
+      --  	 --  PB0, 1 are on USB power signal
+      --  	 --  PB2 is the boot1 jumper
+      --  	 --  PB3, 4 are on jtag
+      --  	 --  PB8, 9 are on UEXT
+      --  	 --  PB10, 11 are on the boot socket (could perhaps be used)
+      --  	 --  PB12, 13, 14, 15 are on USB_OTG2 (could perhaps be used)
+      --  	 ---------------------------------------
+      --  	 -- set up uart1 pins to gpio.port B pins 6 and 7.
+      --  	 bModer_Tmp (6 .. 7)   := (others => Gpio.Alt_Func);
+      --  	 bOspeedr_Tmp (6 .. 7) := (others => Gpio.Speed_50MHz);
+      --  	 bOtyper_Tmp (6 .. 7)  := (others => Gpio.Push_Pull);
+      --  	 bPupdr_Tmp (6 .. 7)   := (others => Gpio.Pull_Up);
+      --  	 bAfrl_Tmp (6 .. 7)    := (others => Gpio.Af7);
+      --  	 -- write to hardware
+      --  	 R.GPIOB.MODER         := bModer_Tmp;
+      --  	 R.GPIOB.Ospeedr       := bOspeedr_Tmp;
+      --  	 R.GPIOB.Otyper        := bOtyper_Tmp;
+      --  	 R.GPIOB.Pupdr         := bPupdr_Tmp;
+      --  	 R.GPIOB.Afrl          := bAfrl_Tmp;
+      --  end;
+      
+      --  GPIOC registers
+      declare
+	 cModer_tmp   : Stm.Bits_16x2       := R.GPIOc.Moder;
+	 cOspeedr_Tmp : Stm.Bits_16x2       := R.GPIOc.Ospeedr;
+	 cOtyper_Tmp  : Stm.Bits_16x1       := R.GPIOc.Otyper;
+	 cPupdr_Tmp   : Stm.Bits_16x2       := R.GPIOc.Pupdr;
+	 cAfrl_Tmp    : Gpio.Afrl_Register  := R.GPIOc.Afrl;  
+      begin
+	 --  do not use
+	 --  PC2, 3, 6, 7 are on UEXT
+	 --  PC8, 9, 10, 11, 12 are on SD card
+	 --  PC13 is an LED
+	 --  PC14, 15 are clock crystal
+	 ----------------------------------------
+	 -- set up eth_rmii interface pins
+	 --
+	 -- PC1  -- MDC Management data clock line, out
+	 -- PC4  -- RXD0 Receive data bit 0, in
+	 -- PC5  -- RXD1 Receive data bit 1, 1
+	 CModer_Tmp (1)        := Gpio.Alt_Func;
+	 CModer_Tmp (4 .. 5)   := (others => Gpio.Alt_Func);
+	 cOspeedr_Tmp (1)      := Gpio.Speed_50MHz;
+	 cOtyper_Tmp (1)       := Gpio.Push_Pull;
+	 cPupdr_Tmp (4 .. 5)   := (others => Gpio.Pull_Up);
+	 cAfrl_Tmp (1)         := Gpio.Af11;
+	 cAfrl_Tmp (4 .. 5)    := (others => Gpio.Af11);
+	 ---------------------------------------
+	 -- set up uart6 pins to gpio.port C pins 6 and 7.
+	 --
+	 --  PC6 is TX
+	 --  PC7 is RX
+	 cModer_Tmp (6 .. 7)   := (others => Gpio.Alt_Func);
+      	 cOspeedr_Tmp (6 .. 7) := (others => Gpio.Speed_50MHz);
+      	 cOtyper_Tmp (6 .. 7)  := (others => Gpio.Push_Pull);
+      	 cPupdr_Tmp (6 .. 7)   := (others => Gpio.Pull_Up);
+      	 cAfrl_Tmp (6 .. 7)    := (others => Gpio.Af7);
+	 ----------------------------------------------
+	 -- write to hardware
+	 R.GPIOc.Moder         := CModer_Tmp;  
+	 R.GPIOc.Ospeedr       := COspeedr_Tmp;
+	 R.GPIOc.Otyper        := COtyper_Tmp; 
+	 R.GPIOc.Pupdr         := CPupdr_Tmp;   
+	 R.GPIOc.Afrl          := CAfrl_Tmp;     
+      end;
+      
+      --  GPIOD registers
+      --  do not use
+      --  PD2 is on SD card
+      
+      --  GPIOE registers
+      
+      --  GPIOF registers
+      --  do not use
+      --  PF11 is on USB power signal
+      
+      --  GPIOG registers
+      declare
+	 gModer_tmp   : Stm.Bits_16x2       := R.GPIOg.Moder;
+	 gOspeedr_Tmp : Stm.Bits_16x2       := R.GPIOg.Ospeedr;
+	 gOtyper_Tmp  : Stm.Bits_16x1       := R.GPIOg.Otyper;
+	 gPupdr_Tmp   : Stm.Bits_16x2       := R.GPIOg.Pupdr;
+	 --gAfrl_Tmp    : Gpio.Afrl_Register  := R.GPIOg.Afrl;  
+	 gAfrh_Tmp    : Gpio.Afrh_Register  := R.GPIOg.Afrh;  
+      begin
+	 --  do not use
+	 --  PG10 is on UEXT
+	 ----------------------------------------
+	 -- set up eth_rmii interface pins
+	 --
+	 -- PG6   -- RST, not part of rmii, out
+	 -- PG11  -- TX_EN When high, clock data on TXD0 and TXD1 to the transmitter 
+	 -- PG13  -- TXD0 Transmit data bit 0
+	 -- PG14  -- TXD1 Transmit data bit 1
+	 GModer_Tmp (6)        := Gpio.Output;
+	 GModer_Tmp (11)       := Gpio.Alt_Func;
+	 GModer_Tmp (13 .. 14) := (others => Gpio.Alt_Func);
+	 GOspeedr_Tmp (6)      := Gpio.Speed_25MHz;
+	 GOspeedr_Tmp (11)     := Gpio.Speed_100MHz;
+	 GOspeedr_Tmp (13 .. 14) := (others => Gpio.Speed_100MHz);
+	 GOtyper_Tmp (6)       := Gpio.Push_Pull;
+	 GOtyper_Tmp (11)      := Gpio.Push_Pull;
+	 GOtyper_Tmp (13 .. 14) := (others => Gpio.Push_Pull);
+	 GPupdr_Tmp (6)        := Gpio.Pull_Down;
+	 GPupdr_Tmp (11)       := Gpio.Pull_Down;
+	 GPupdr_Tmp (13 .. 14) := (others => Gpio.Pull_Down);
+	 GAfrh_Tmp (11)        := Gpio.Af11;
+	 GAfrh_Tmp (13 .. 14)  := (others => Gpio.Af11);
+	 -- write to hardware
+	 R.GPIOg.Moder         := GModer_Tmp;
+	 R.GPIOg.Ospeedr       := GOspeedr_Tmp;
+	 R.GPIOg.Otyper        := GOtyper_Tmp; 
+	 R.GPIOg.Pupdr         := GPupdr_Tmp;  
+	 --R.GPIOg.Afrl          := GAfrl_Tmp;
+	 R.GPIOg.Afrh          := GAfrh_Tmp;
+      end;
+      ----------------------------------------
+      -- init the usart and its dma:
+      Finrod.Sermon.Init_Usart6;
+      --,init the ethernet with dma and ptp
+      Finrod.Net.Eth.Init_Ethernet;
+   end Init_Pins;
+   
   
   function Get_Id return Board_Id
   is
@@ -209,6 +356,24 @@ package body Finrod.Board is
      return Master_Ip_Address;
   end Get_Master_Ip_Address;
   
+  function Get_Bcast_Address return Mac_Address
+  is
+  begin
+     return Broadcast_Mac_Address;
+  end Get_Bcast_Address;
+     
+  function Get_PHY_Address return Stm32F4.Bits_5
+  is
+  begin
+     return PHY_Address;
+  end Get_PHY_Address;
+  
+  function Get_PHY_Mspeed return Stm.Bits_3;
+  is
+  begin
+     return PHY_MSpeed
+  end Get_PHY_Mspeed;
+     
   
   procedure Set_Id (Id : Board_Id)
   is

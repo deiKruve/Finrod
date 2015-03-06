@@ -53,21 +53,22 @@ package body Finrod.Sermon is
    --------------------------------
    
    -- APB1_Clock (which USART 2,3,4,5,7,8 are on) is 42 MHz
+   -- APB2_Clock (usart1, 6) on 84 MHz
+   
    APB1_Clock           : constant Long_Float := 42_000_000.0;
    APB2_Clock           : constant Long_Float := 84_000_000.0;
-   pragma Unreferenced (APB2_Clock);
-   -- APB2_Clock (usart1) on 84 MHz
-   USART1_Baudrate      : constant Long_Float := 115200.0;
+   pragma Unreferenced (APB1_Clock);
+   USART6_Baudrate      : constant Long_Float := 115200.0;
    
    -- calculate baudrate contants for over_8 = 0
-   USART1_D             : constant Long_Float := 
-     APB1_Clock / (16.0 * USART1_Baudrate);
-   USART1_Div_Mantissa  : constant Stm.Bits_12 := 
-     Stm.Bits_12 (Long_Float'Truncation (USART1_D));
-   USART1_Div_Fraction  : constant Stm.Bits_4  := 
+   USART6_D             : constant Long_Float := 
+     APB2_Clock / (16.0 * USART6_Baudrate);
+   USART6_Div_Mantissa  : constant Stm.Bits_12 := 
+     Stm.Bits_12 (Long_Float'Truncation (USART6_D));
+   USART6_Div_Fraction  : constant Stm.Bits_4  := 
      Stm.Bits_4 (Long_Float'Rounding 
-		((USART1_D - Long_Float (USART1_Div_Mantissa)) * 16.0));
-   pragma Unreferenced (USART1_Div_Fraction);
+		((USART6_D - Long_Float (USART6_Div_Mantissa)) * 16.0));
+   
    
    -- this register must be global 
    S7_Cr_Tmp : Dma.CR_Register;
@@ -183,7 +184,7 @@ package body Finrod.Sermon is
    function Transmitter_Is_Empty return Boolean
    is
       use type Stm.Bits_1;
-      Sr_Tmp  : constant Uart.Sr_Register  := R.Usart1.Sr;
+      Sr_Tmp  : constant Uart.Sr_Register  := R.Usart6.Sr;
    begin
       if  Sr_Tmp.Txe = Uart.Dr_Mt then
 	 return True;
@@ -196,7 +197,7 @@ package body Finrod.Sermon is
    function Uart_Error return Boolean
    is
       use type Stm.Bits_1;
-      Sr_Tmp  : constant Uart.Sr_Register  := R.Usart1.Sr;
+      Sr_Tmp  : constant Uart.Sr_Register  := R.Usart6.Sr;
    begin
       if  (Sr_Tmp.Ore or Sr_Tmp.Fe or Sr_Tmp.Nf) = Uart.Tripped then 
 	 return True;
@@ -275,17 +276,17 @@ package body Finrod.Sermon is
    
    
    ---------------------
-   -- Init Usart1 DMA --
+   -- Init Usart6 DMA --
    -- for the xmitter --
    ---------------------
    
-   procedure Init_Usart1_Dma7
+   procedure Init_Usart6_Dma7_5
    is
       use type Stm.Bits_1;
       LIFCR_Tmp : constant Dma.LIFCR_Register := To_LIFCR_Bits (0);
       HIFCR_Tmp : constant Dma.HIFCR_Register := To_HIFCR_Bits (0);
       Par_Tmp   : constant Dma.PAR_Register   := 
-	To_Bits_32 (R.Usart1.Dr'address);
+	To_Bits_32 (R.Usart6.Dr'address);
       M0ar_Tmp  : constant Dma.M0ar_Register  :=
 	To_Bits_32 (Uart_Data_Tobe_Send'Address);
    begin
@@ -312,7 +313,7 @@ package body Finrod.Sermon is
       R.Dma2.S7.M0ar  := M0ar_Tmp;  --  string address
       
       -- control register variabelen
-      S7_Cr_Tmp.CHSEL    := Dma.Sel_Ch4;
+      S7_Cr_Tmp.CHSEL    := Dma.Sel_Ch5; -- channel 5 is used
       S7_Cr_Tmp.MBURST   := Dma.Single;
       S7_Cr_Tmp.PBURST   := Dma.Single;
       S7_Cr_Tmp.Pl       := Dma.Low; -- low priority for transmission
@@ -326,28 +327,28 @@ package body Finrod.Sermon is
       
       -- S7_Cr_Tmp is global hence its data stays intact 
       --  for the data send routine where the dma is enabled.
-   end Init_Usart1_Dma7;
+   end Init_Usart6_Dma7_5;
    
    
    ----------------------
-   -- Init Usart1 DMA  --
+   -- Init Usart6 DMA  --
    -- for the receiver --
    ----------------------
    
-   procedure Init_Usart1_Dma2
+   procedure Init_Usart6_Dma2_5
    is
       use type Stm.Bits_1;
       S2_Cr_Tmp : Dma.CR_Register             := To_Cr_Bits (0);
       LIFCR_Tmp : constant Dma.LIFCR_Register := To_LIFCR_Bits (0);
       HIFCR_Tmp : constant Dma.HIFCR_Register := To_HIFCR_Bits (0);
       Par_Tmp   : constant Dma.PAR_Register   := 
-	To_Bits_32 (R.Usart1.Dr'address);
+	To_Bits_32 (R.Usart6.Dr'address);
       M0ar_Tmp  : constant Dma.M0ar_Register  := 
 	To_Bits_32 (Serial_Recd_Ring_Buffer'Address);
       Ndtr_Tmp  : Dma.Ndtr_Register;
    begin
       -- configure stream 2 for reception
-      -- disable stream1 and zero control bits
+      -- disable stream2 and zero control bits
       R.Dma2.S2.Cr    := S2_Cr_Tmp; 
       
       -- wait for done
@@ -372,7 +373,7 @@ package body Finrod.Sermon is
       R.Dma2.S2.NDTR     := Ndtr_Tmp;     --  write ring size
       
       -- control register variabelen
-      S2_Cr_Tmp.CHSEL    := Dma.Sel_Ch4;
+      S2_Cr_Tmp.CHSEL    := Dma.Sel_Ch5; -- channel 5 is used
       S2_Cr_Tmp.MBURST   := Dma.Single;
       S2_Cr_Tmp.PBURST   := Dma.Single;
       S2_Cr_Tmp.Pl       := Dma.high; -- high priority for reception
@@ -388,50 +389,50 @@ package body Finrod.Sermon is
       -- enable dma
       S2_Cr_Tmp.En       := Dma.Enable;
       R.Dma2.S2.Cr       := S2_Cr_Tmp; 
-   end Init_Usart1_Dma2;
+   end Init_Usart6_Dma2_5;
  
    
    -----------------
-   -- Init_USART1 --
+   -- Init_USART6 --
    -----------------
    
-   procedure Init_USART1 
+   procedure Init_USART6 
    is
-      Brr_Tmp : Uart.BRR_Register := R.Usart1.Brr;
-      pragma Unreferenced (Brr_Tmp);
-      Cr1_Tmp : Uart.Cr1_Register := R.Usart1.Cr1; -- hopefully all 0
-      Cr2_Tmp : Uart.Cr2_Register := R.Usart1.Cr2;
-      Cr3_Tmp : Uart.Cr3_Register := R.Usart1.Cr3;
-      Sr_Tmp  : Uart.Sr_Register  := R.Usart1.Sr;
+      Brr_Tmp : Uart.BRR_Register := R.Usart6.Brr;
+      --pragma Unreferenced (Brr_Tmp);
+      Cr1_Tmp : Uart.Cr1_Register := R.Usart6.Cr1; -- hopefully all 0
+      Cr2_Tmp : Uart.Cr2_Register := R.Usart6.Cr2;
+      Cr3_Tmp : Uart.Cr3_Register := R.Usart6.Cr3;
+      Sr_Tmp  : Uart.Sr_Register  := R.Usart6.Sr;
    begin
       Cr1_Tmp.Ue   := Uart.Enable; -- uart enable
       Cr1_Tmp.M    := Uart.D8_Bits; -- 8 databits
-      R.Usart1.Cr1 := Cr1_Tmp;
+      R.Usart6.Cr1 := Cr1_Tmp;
       
       Cr2_Tmp.STOP := Uart.S2_Bit; -- 2 stopbits
-      R.Usart1.Cr2 := Cr2_Tmp;
+      R.Usart6.Cr2 := Cr2_Tmp;
       
       Cr3_Tmp.Dmat  := Uart.Enable; -- transmitter DMA
       Cr3_Tmp.Dmar  := Uart.Enable; -- receiver DMA
       Cr3_Tmp.HDSEL := Uart.Off; -- full duplex
-      --Init_Usart1_Dma2; -- dont know why this was here
-      R.Usart1.Cr3  := Cr3_Tmp;
+      --Init_Usart6_Dma2; -- dont know why this was here
+      R.Usart6.Cr3  := Cr3_Tmp;
       
-      --Brr_Tmp.DIV_Mantissa := USART1_Div_Mantissa; -- baudrate register
-      --Brr_Tmp.DIV_Fraction := USART1_Div_Fraction; -- at 115200
-      --R.Usart1.Brr         := Brr_Tmp;
+      Brr_Tmp.DIV_Mantissa := USART6_Div_Mantissa; -- baudrate register
+      Brr_Tmp.DIV_Fraction := USART6_Div_Fraction; -- at 115200
+      R.Usart6.Brr         := Brr_Tmp;
       
-      Init_Usart1_Dma7; -- for the xmitter side
-      Init_Usart1_Dma2; -- for the receiver side
+      Init_Usart6_Dma7_5; -- for the xmitter side
+      Init_Usart6_Dma2_5; -- for the receiver side
       
       Sr_Tmp.Tc    := Uart.Off; -- clear transmitter complete in the uart
-      R.Usart1.Sr  := Sr_Tmp;
+      R.Usart6.Sr  := Sr_Tmp;
       
       Cr1_Tmp.Te   := Uart.Enable; -- xmitter enable
       Cr1_Tmp.Re   := Uart.Enable; -- receiver enable.
-      R.Usart1.Cr1 := Cr1_Tmp;
+      R.Usart6.Cr1 := Cr1_Tmp;
 
-   end Init_USART1;
+   end Init_USART6;
    
 begin
    Serial_Recd_Data_A := Serial_Recd_Data'Access;

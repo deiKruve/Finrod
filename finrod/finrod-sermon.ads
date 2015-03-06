@@ -41,7 +41,7 @@
 
 with STM32F4;
 
-package Finrod.Sermon is
+package Finrod.Sermon with Elaborate_Body is
    
    ------------------------------------------
    -- Incoming Message Interface structure --
@@ -84,8 +84,8 @@ package Finrod.Sermon is
    -- initialize the sermon --
    ---------------------------
    
-   procedure Init_USART1;
-   -- initializes uart1 and its dma structure
+   procedure Init_USART6;
+   -- initializes uart6 and its dma structure
    -- both for sending and receiving.
    -- Baudrate 115200.
    -- 8 databits, no parity, 2 stopbits, full duplex
