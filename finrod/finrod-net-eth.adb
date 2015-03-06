@@ -39,6 +39,7 @@ with STM32F4.o7xx.Eth;
 with STM32F4.o7xx.Registers;
 
 with Finrod.Board;
+with Finrod.Thread;
 
 package body Finrod.Net.Eth is
    
@@ -48,105 +49,46 @@ package body Finrod.Net.Eth is
    package Ebuf renames  STM32F4.o7xx.Ethbuf;
    package Eth  renames  STM32F4.o7xx.Eth;
    package R    renames  STM32F4.o7xx.Registers;
-   
+   package Thr  renames  Finrod.Thread;
       
    ------------------------------
    -- some types and constants --
    ------------------------------
    
-   -- Bd   : Sto.Storage_Offset; -- in case we need an index
+   -- the frame buffers
+   -- four, they are unisex, can be used for xmit and recv
    Buf1 : Sto.Storage_Array (1 .. 1024);
    Buf2 : Sto.Storage_Array (1 .. 1024);
    Buf3 : Sto.Storage_Array (1 .. 1024);
    Buf4 : Sto.Storage_Array (1 .. 1024);
    
-   function Tob is new
-     Ada.Unchecked_Conversion (Source => System.Address,
-   			       Target => Stm.Bits_32);
-   function Toa is new
-     Ada.Unchecked_Conversion (Source => Stm.Bits_32,
-			       Target => System.Address);
-   
-   -- type Sto.Integer_Address is mod Memory_Size;
-   -- Sto.To_Integer (Value : Address) return Integer_Address;
-   -- Sto.To_Address (Value : Integer_Address) return Address;
-   
-   --type Rx_Access_Type is access all Ebuf.Xl_Recv_Desc_Type;
-   --type Tx_Access_Type is access all Ebuf.Xl_Xmit_Desc_Type;
-   
+
+   -- the frame descriptors
+   -- 3 of each, until we need more
    Rx_Desc_1 : Ebuf.Xl_Recv_Desc_Type;
    Rx_Desc_2 : Ebuf.Xl_Recv_Desc_Type;
    Rx_Desc_3 : Ebuf.Xl_Recv_Desc_Type;
-   
-   
+
    Tx_Desc_1 : Ebuf.Xl_Xmit_Desc_Type;
    Tx_Desc_2 : Ebuf.Xl_Xmit_Desc_Type;
    Tx_Desc_3 : Ebuf.Xl_Xmit_Desc_Type;
-  
    
-   ---------------------
-   --  local helpers  --
-   ---------------------
+   -- conversions 
+   function Tob is new
+     Ada.Unchecked_Conversion (Source => System.Address,
+   			       Target => Stm.Bits_32);
+   --  function Toa is new
+   --    Ada.Unchecked_Conversion (Source => Stm.Bits_32,
+   --  			       Target => System.Address);
    
-   -- PHY wite routine
-   procedure Phy_Write (pAddr : Stm.Bits_5; 
-			MReg  : Stm.Bits_5; 
-			Clk   : Stm.Bits_3; 
-			Data  : Stm.Bits_16)
-   is
-      use type Stm.Bits_1;
-      MACMIIAR_Tmp : Eth.MACMIIAR_Register := R.Eth_Mac.MACMIIAR;
-      MACMIIDR_Tmp : Eth.MACMIIDR_Register := R.Eth_Mac.MACMIIDR;
-   begin
-      MACMIIDR_Tmp.MD    := Data;
-      R.Eth_Mac.MACMIIDR := MACMIIDR_Tmp;
-      -- wait for PHY available
-      while MACMIIAR_Tmp.Mb /= Eth.Clear loop
-	 MACMIIAR_Tmp    := R.Eth_Mac.MACMIIAR;
-      end loop;
-      MACMIIAR_Tmp.Pa    := Paddr;
-      MACMIIAR_Tmp.Mr    := Mreg;
-      MACMIIAR_Tmp.Cr    := Clk;
-      MACMIIAR_Tmp.Mw    := Eth.Write;
-      MACMIIAR_Tmp.Mb    := Eth.Busy;
-      R.Eth_Mac.MACMIIAR := MACMIIAR_Tmp;
-   end Phy_Write;
-   
-   
-   -- PHY read routine
-   function Phy_Read (pAddr : Stm.Bits_5; 
-		      MReg  : Stm.Bits_5; 
-		      Clk   : Stm.Bits_3)
-		     return Stm.Bits_16
-   is
-      use type Stm.Bits_1;
-      MACMIIAR_Tmp : Eth.MACMIIAR_Register := R.Eth_Mac.MACMIIAR;
-   begin
-      -- wait for PHY available
-      while MACMIIAR_Tmp.Mb /= Eth.Clear loop
-	 MACMIIAR_Tmp    := R.Eth_Mac.MACMIIAR;
-      end loop;
-      MACMIIAR_Tmp.Pa    := Paddr;
-      MACMIIAR_Tmp.Mr    := Mreg;
-      MACMIIAR_Tmp.Cr    := Clk;
-      MACMIIAR_Tmp.Mw    := Eth.Read;
-      MACMIIAR_Tmp.Mb    := Eth.Busy;
-      R.Eth_Mac.MACMIIAR := MACMIIAR_Tmp;
-      -- wait for PHY done
-      while MACMIIAR_Tmp.Mb /= Eth.Clear loop
-	 MACMIIAR_Tmp    := R.Eth_Mac.MACMIIAR;
-      end loop;
-      return R.Eth_Mac.MACMIIDR.Md;
-   end Phy_Read;
- 
    
    ----------------------
-   -- public interface --
+   --  local helpers   --
+   --  mainly to build -- 
+   --  the circus tent --
    ----------------------
    
-   
-   -- builds the circus tent
-   procedure Init_Ethernet
+   procedure Init_buffers
    is
    begin
       --- initialize the rx descriptors, as far as known
@@ -240,31 +182,35 @@ package body Finrod.Net.Eth is
       Tx_Desc_3.Tdes2.Tbap1 := Tob (Buf4'Address); -- for the time being!!!!!
       
       Tx_Desc_3.Tdes3.Tbap2 := Tob (Tx_Desc_1'Address);
-      ---------------------------------------------------
-      -- next section, do a warm dma reset incase this was a warm init.
-      declare
-	 use type Stm.Bits_1;
-	 Dmabmr_Tmp : Eth.DMABMR_Register := R.Eth_Mac.DMABMR;
-      begin
-	 Dmabmr_Tmp.SR := Eth.Reset;
-	 R.Eth_Mac.DMABMR := Dmabmr_Tmp;
-	 while Dmabmr_Tmp.SR /= Eth.Off loop
-	    Dmabmr_Tmp := R.Eth_Mac.DMABMR;
-	 end loop;
-      end;
-      
-      -- next Set the 1st MAC address
-      declare 
-	 use type Stm.Bits_48;
-	 use type Ifce.Unsigned_64;
-	 MACA0HR_Tmp : Eth.MACA0HR_Register := R.Eth_Mac.MACA0HR;
-	 Address  : Ifce.Unsigned_64  := Ifce.Unsigned_64 (Board.Get_Mac_Address);
-      begin
-	 R.Eth_Mac.MACA0LR  := Stm.Bits_32 (Address);
-	 MACA0HR_Tmp.MACA0H := Stm.Bits_16 (Ifce.Shift_Right (Address, 32));
-	 MACA0HR_Tmp.Mo     := 1;
-	 R.Eth_Mac.MACA0HR  := MACA0HR_Tmp;
-      end;
+   end Init_Buffers;
+   
+   
+   -- next section, do a warm dma reset incase this was a warm init.
+   procedure Dma_Reset
+   is
+      use type Stm.Bits_1;
+      Dmabmr_Tmp : Eth.DMABMR_Register := R.Eth_Mac.DMABMR;
+   begin
+      Dmabmr_Tmp.SR := Eth.Reset;
+      R.Eth_Mac.DMABMR := Dmabmr_Tmp;
+      while Dmabmr_Tmp.SR /= Eth.Off loop
+	 Dmabmr_Tmp := R.Eth_Mac.DMABMR;
+      end loop;
+   end Dma_Reset;
+   
+   
+   -- next Set the 1st MAC address
+   procedure Set_Addresses
+   is
+      use type Stm.Bits_48;
+      use type Ifce.Unsigned_64;
+      MACA0HR_Tmp : Eth.MACA0HR_Register := R.Eth_Mac.MACA0HR;
+      Address  : Ifce.Unsigned_64  := Ifce.Unsigned_64 (Board.Get_Mac_Address);
+   begin
+      R.Eth_Mac.MACA0LR  := Stm.Bits_32 (Address);
+      MACA0HR_Tmp.MACA0H := Stm.Bits_16 (Ifce.Shift_Right (Address, 32));
+      MACA0HR_Tmp.Mo     := 1;
+      R.Eth_Mac.MACA0HR  := MACA0HR_Tmp;
       
       -- set broadcast address
       declare 
@@ -281,67 +227,71 @@ package body Finrod.Net.Eth is
 	 MACA1HR_Tmp.Mbc    := Eth.Lsbyte + Eth.Byte2;
 	 R.Eth_Mac.MACA1HR  := MACA1HR_Tmp;
       end;
-      
-      -- lets do the mac frame filter register first
-      declare
+   end Set_Addresses;
+   
+   
+      -- the mac frame filter 
+   procedure Init_Frame_Filter 
+     is
 	 MACFFR_Tmp : Eth.MACFFR_Register := R.Eth_Mac.MACFFR;
       begin
-	 MACFFR_Tmp.RA    := Eth.Off; -- Receive all
-	 MACFFR_Tmp.HPF   := Eth.Either; -- Hash or perfect filter
-	 MACFFR_Tmp.SAF   := Eth.Off; -- Source address filter enable
+	 MACFFR_Tmp.RA    := Eth.Off;       -- Receive all
+	 MACFFR_Tmp.HPF   := Eth.Off;       -- for perfect, acc cube
+	 MACFFR_Tmp.SAF   := Eth.Off;       -- Source address filter enable
 	 MACFFR_Tmp.SAIF  := Eth.Off; 
 	 MACFFR_Tmp.PCF   := Eth.PCF_BlockAll;
 	 MACFFR_Tmp.BFD   := Eth.Pass_Allb; -- Broadcast frame disable
 	 MACFFR_Tmp.PAM   := Eth.Pass_Allm; -- Pass all mutlicast
 	 MACFFR_Tmp.DAIF  := Eth.Off; 
-	 MACFFR_Tmp.HM    := Eth.Normal; -- Hash multicast
-	 MACFFR_Tmp.HU    := Eth.Normal; -- Hash unicast
-	 MACFFR_Tmp.PM    := Eth.Off;    -- Promiscuous mode
+	 MACFFR_Tmp.HM    := Eth.Off;       -- for perfect, acc cube
+	 MACFFR_Tmp.HU    := Eth.Normal;    -- for perfect, acc cube
+	 MACFFR_Tmp.PM    := Eth.Off;       -- Promiscuous mode off
 	 R.Eth_Mac.MACFFR := MACFFR_Tmp;
-      end;
+      end Init_Frame_Filter;
       
-      -- get the PHY going
-      declare
-	 Phy_Addr   : Stm.Bits_5 := Board.Get_PHY_Address;
-	 Phy_Mspeed : Stm.Bits_3 := Board.Get_PHY_Mspeed;
-      begin
-	 Phy_Write (PAddr => Phy_Addr,
-		    MReg  => 0;
-		    Clk   => Phy_Mspeed;
-		    Data  => 16#8_000#; -- reset
-		    
-      
+
       -- mac control register
-      declare
+      procedure Init_Maccr
+      is
 	 MACCR_Tmp : Eth.MACCR_Register := R.Eth_Mac.MACCR;
       begin
 	 MACCR_Tmp.CSTF  := Eth.Strip_Crc;
-	 MACCR_Tmp.Wd    := Eth.Disable_WD;------------------
-	 MACCR_Tmp.JD    := Eth.Disable_Jt;------------------
+	 MACCR_Tmp.Wd    := Eth.WD_On; -- according to cube (2048 bytes max)
+	 MACCR_Tmp.JD    := Eth.Jt_On; -- according to cube (2048 bytes max)
 	 MACCR_Tmp.IFG   := Eth.IFG_96Bit;
-	 MACCR_Tmp.CSD   := Eth.Cs_Disable; -- check for RMII-----------
+	 MACCR_Tmp.CSD   := Eth.Cs_On; -- cube but -- check for RMII --------
 	 MACCR_Tmp.FES   := Eth.Mb_100;
-	 MACCR_Tmp.ROD   := Eth.Ro_Disable;
-	 MACCR_Tmp.LM    := Eth.Off; -- loopback off
-	 MACCR_Tmp.DM    := Eth.Off; -- duplex mode off
+	 MACCR_Tmp.ROD   := Eth.Off;   -- enabled, acc to cube
+	 MACCR_Tmp.LM    := Eth.Off;   -- loopback off
+	 MACCR_Tmp.DM    := Eth.Off;   -- duplex mode off
 	 MACCR_Tmp.IPCO  := Eth.Enabled; -- ip checksum offload on
 	 MACCR_Tmp.RD    := Eth.Retr_Disabled; -- gives an error after 1 collision
 	 -- this when working, and when starting up????----------------------
-	 MACCR_Tmp.APCS  := Eth.On; -- Automatic Pad/CRC stripping
+	 MACCR_Tmp.APCS  := Eth.On;    -- Automatic Pad/CRC stripping
 	 MACCR_Tmp.Bl    := Eth.BL_10; -- back off time when collision.
-	 MACCR_Tmp.DC    := Eth.On; -- deferral check max and give error.
+	 MACCR_Tmp.DC    := Eth.On;    -- deferral check max and give error.
 	 R.Eth_Mac.MACCR := MACCR_Tmp;
 	 
 	 -- and we are not done yet, everything is still off.
-	 
-      end;
+      end Init_Maccr;
       
       
-   end Init_Ethernet;
+      -- and here comes die ganze Zirkuskraft.
+      procedure Starting with inline
+      is
+	 MACCR_Tmp : Eth.MACCR_Register := R.Eth_Mac.MACCR;
+      begin
+	 MACCR_Tmp.Te    := Eth.On;
+	 MACCR_Tmp.Re    := Eth.On;
+	 R.Eth_Mac.MACCR := MACCR_Tmp;
+      end Starting;
    
-
    
+   ----------------------
+   -- public interface --
+   ----------------------
    
+ 
    -- poll for a received frame and determine the type.
    -- stash any split 2nd halves
    function Poll_Received return Poll_R_Reply_Type
@@ -392,7 +342,84 @@ package body Finrod.Net.Eth is
    begin
       null;
    end Send_Frame;
-      
+   
+   
+   ------------------------------
+   --  for initialization  of  --
+   -- the finite state machine --
+   ------------------------------
+   
+   Fsm_State : State_Selector_Type := Eth_Idle;
+   
+   procedure Fsm
+   is
+   begin
+      case Fsm_State is
+	 when Eth_Idle              =>
+	    null;
+	 when Eth_Init_Buffers      =>
+	    Init_Buffers;
+	    Fsm_State := Eth_Dma_Reset;
+	 when Eth_Dma_Reset         =>
+	    Dma_Reset;
+	    Fsm_State := Eth_Set_Addresses;
+	 when Eth_Set_Addresses     =>
+	    Set_Addresses;
+	    Fsm_State := Eth_Init_Frame_Filter;
+	 when Eth_Init_Frame_Filter =>
+	    Init_Frame_Filter;
+	    Fsm_State := Eth_Init_Maccr;
+	 when Eth_Init_Maccr        =>
+	    Init_Maccr;
+	    fsm_State := Eth_Waiting_To_Start;
+	 when Eth_Waiting_To_Start  =>
+	    Thr.Delete_Job (Fsm'Access);
+	    fsm_State := Eth_Ready_To_Start;
+	 when Eth_Ready_To_Start    =>
+	    null; -- hang here until the phy is done
+	 when Eth_Starting          =>
+	    Starting;
+	    Thr.Delete_Job (Fsm'Access);
+	    Fsm_State := Eth_Ready;
+	 when Eth_Ready             =>
+	    null;
+      end case;
+   end Fsm;
+   
+   
+   -- when the initialization is done 'State' will return 'Eth_Ready_To_Start'.
+   -- when the initialization is done 'State' will return 'Eth_Ready'.
+   function State return State_Selector_Type 
+   is (Fsm_State);
+   
+   
+   -- starts the ETH initialization procedure from a soft reset.
+   -- it will put the PHY's init fsm on the job stack for executing 1 pass
+   -- every scan period.
+   -- once finished the fsm will disappear from the jobstack and 
+   -- the state selector will be at ready.
+   procedure Reset
+   is
+   begin
+      Fsm_State := Eth_Init_Buffers;
+      Thr.Insert_Job (Fsm'Access);
+   end Reset;
+   
+   
+   -- starts all ethernet facilities.
+   -- if not in State 'Eth_Ready_To_Start' the function will return false.
+   -- else true.
+   function Eth_Start return Boolean 
+   is
+   begin
+      if Fsm_State = Eth_Ready_To_Start then
+	 Thr.Insert_Job (Fsm'Access);
+	 return True;
+      else return False;
+      end if;
+   end Eth_Start;
+   
+   
    ---------------------
    -- debug interface --
    ---------------------

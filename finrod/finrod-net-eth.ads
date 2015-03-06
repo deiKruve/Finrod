@@ -43,14 +43,11 @@ package Finrod.Net.Eth is
    -- some types and constants --
    ------------------------------
    
+  
    ----------------------
    -- public interface --
    ----------------------
    
-   procedure Init_Ethernet;
-   -- builds the circus tent
-   
-    
    function Poll_Received return Poll_R_Reply_Type;
    -- poll for a received frame and determine the type.
    -- stash any split 2nd halves
@@ -85,13 +82,44 @@ package Finrod.Net.Eth is
    -- use Poll_Xmit_Completed after this command to ascertain its gone.
    
    
+   --------------------------
+   --  for initialization  --
+   --------------------------
+   
+   type State_Selector_Type is (Eth_Idle,
+				Eth_Init_buffers,
+				Eth_Dma_Reset,
+				Eth_Set_Addresses,
+				Eth_Init_Frame_Filter,
+				Eth_Init_Maccr,
+				Eth_Waiting_To_Start,
+				Eth_Ready_To_Start,
+				Eth_Starting,
+				Eth_Ready);
+   
+   function State return State_Selector_Type with inline;
+   -- when the initialization is done 'State' will return 'Phy_Ready'.
+   
+   procedure Reset with inline;
+   -- starts the ETH initialization procedure from a soft reset.
+   -- it will put the PHY's init fsm on the job stack for executing 1 pass
+   -- every scan period.
+   -- once finished the fsm will disappear from the jobstack and 
+   -- the state selector will be at ready.
+   
+   function Eth_Start return Boolean with inline;
+   -- starts all ethernet facilities.
+   -- if not in State 'Eth_Ready_To_Start' the function will return false.
+   -- else true.
+   
+   
    -------------------
    -- debugger      --
    -------------------
+   
    type On_Off_Type is (Off, On);
    
    procedure Set_Mac_Loopback_Mode (B : On_Off_Type);
    -- sets the mac loopback mode on or off
-   
    
 end Finrod.Net.Eth;

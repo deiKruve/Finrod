@@ -33,29 +33,37 @@
 -- and section 7.1.2 of EPSG DSP 301 V1.2.0
 --
 
+with Finrod.Net.Eth.PHY;
 with Finrod.Thread;
 with Finrod.Board;
 
 package body Finrod.Nmt_Init is
    
    package Thr renames Finrod.Thread;
+   package Eth renames Finrod.Net.Eth;
+   package Phy renames Finrod.Net.Eth.PHY;
    
    --------------------------------
    -- constants,                 --
    -- definitions and local vars --
    --------------------------------
    
-   Fsm_State : State_Selector_Type := Nmt_Gs_Powered;
+   Fsm_State : State_Selector_Type := Nmt_Powered;
    
-   
+   -- there was no real need for an fsm here but since this is the theme
+   -- of the project, it was also build in that shape.
+   -- therefor the case discriminator in enclosed in a while loop
    procedure Fsm
    is
+      use type Eth.State_Selector_Type;
+      use type Phy.State_Selector_Type;
    begin
+      while Fsm_State /= Nmt_Ready loop
       case Fsm_State is
-	 when Nmt_Gs_Powered             =>
-	    Fsm_State := Nmt_Gs_Initialising;
+	 when Nmt_Powered             =>
+	    Fsm_State := Nmt_Initialising;
 	    
-	 when Nmt_Gs_Initialising        =>
+	 when Nmt_Initialising        =>
 	    
 	    -- Initialize the basic board with comms, timer, etc
 	    -- insofar not done on the ada startup layer
@@ -70,59 +78,75 @@ package body Finrod.Nmt_Init is
 	    
 	    -- board.set_master_ip_address  -- if special
 	    
-	    Fsm_State := Nmt_Gs_Reset_Application;
+	 when Nmt_Reset_Phy           =>
+	    PHY.Reset;
+	    Thr.Scan;
+	    Thr.Scan; -- so we are waiting now for the reset timeout
+	    Fsm_State := Nmt_Reset_Application;
 	    
-	 when Nmt_Gs_Reset_Application   =>
+	 when Nmt_Reset_Application   =>
 	    null;
-	    
-	    Fsm_State := Nmt_Gs_Reset_Communication;
-	 when Nmt_Gs_Reset_Communication =>
+	    -- insert app init here
+	    Thr.Scan;
+	    Fsm_State := Nmt_Reset_Communication;
+	 when Nmt_Reset_Communication =>
+	    Finrod.Net.Eth.Reset;  -- resets the eth structure
+	    Thr.Scan;
+	    Fsm_State := Nmt_Wait_Communication;
+	 when Nmt_Wait_Communication   =>
+	    Thr.Scan;
+	    if PHY.State = PHY.Phy_Ready and Eth.State = Eth.Eth_Ready then
+	       Fsm_State := Nmt_Reset_Configuration;
+	    end if;
+	 when Nmt_Reset_Configuration =>  -- Could Be Used As A Restart After parms
+					  -- have been changed trough the net.
 	    null;
-	    
-	    Fsm_State := Nmt_Gs_Reset_Configuration;
-	 when Nmt_Gs_Reset_Configuration =>
-	    null;
-	    
-	    Fsm_State := Idle;
-	 when Idle                       =>
-	    Thr.Delete_Job (Fsm'Access); -- happens only once cause then fsm 
+	    Thr.Scan;
+
+	    --Thr.Delete_Job (Fsm'Access); -- happens only once cause then fsm 
 					 -- does not get executed anymore
+	    Fsm_State := Nmt_Ready;
+	 when Nmt_Ready          =>
+	    null;
       end case;
+   end loop;
    end Fsm;
    
    
-   procedure NMT_Sw_Reset
+   procedure Reset
    is
    begin
-      Fsm_State := Nmt_Gs_Initialising;
-      Thr.Insert_Job (Fsm'Access);
-   end NMT_Sw_Reset;
+      Fsm_State := Nmt_Initialising;
+      --Thr.Insert_Job (Fsm'Access);
+      Fsm;
+      -- and go to the next looped fsm here
+      -- like pre-stage1.
+   end Reset;
    
    
-   procedure NMT_Reset_Node
+   -- resets to State
+   -- meant to turn back the clock in case of some error
+   -- carefully look at the state sequence when you decide on this.
+   --
+   -- this should also invalidate the job stack since:
+   -- a. any scan has run its course, although some jobs might be suspended
+   --    in mid air.
+   -- b. we cant have statemachine jobs still executing when we reset the 
+   --    application.
+   --
+   -- an immediate consequence is that it must be safe to enter into any of 
+   -- the states, and restart from there.
+   -- any jobs started in an older scan (i.e. not part of the warm reset) 
+   -- must either stay in the state they were at the warm reset 
+   -- or they must be able to run on to completion
+   -- on or they must be included from scratch in this reset sequence.
+   procedure Reset (State : State_Selector_Type)
    is
    begin
-      Fsm_State := Nmt_Gs_Reset_Application;
-      Thr.Insert_Job (Fsm'Access);
-   end NMT_Reset_Node;
-   
-   
-   procedure NMT_Reset_Communication
-   is
-   begin
-      Fsm_State := Nmt_Gs_Reset_Communication;
-      Thr.Insert_Job (Fsm'Access);
-   end NMT_Reset_Communication;
-   
-   
-   procedure NMT_Reset_Configuration
-   is
-   begin
-      Fsm_State := Nmt_Gs_Reset_Configuration;
-      Thr.Insert_Job (Fsm'Access);
-   end NMT_Reset_Configuration;
-   
+      Fsm_State := State;
+   end Reset;
+         
 begin
-   NMT_Sw_Reset;
-   Thr.Scan;
+   Reset;
+   -- Thr.Scan;
 end Finrod.Nmt_Init;

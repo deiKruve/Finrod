@@ -1,6 +1,8 @@
 
 --with System.BB.Board_Support;
 
+with STM32F4;
+
 -- this is a dummy module, for compiling on x86
 
 package Finrod.Timer is
@@ -36,6 +38,14 @@ package Finrod.Timer is
    
    procedure Reset;
    -- resets all variables and accumulators;
+   
+   procedure Start_Timer1 (Secs : Stm32f4.Bits_31; Subsecs : Stm32f4.Bits_32);
+   -- starts timer1 
+   -- input Secs    : number of seconds to run
+   --       subSecs : nano seconds to run
+   
+   function Done1 return Boolean with Inline;
+   -- Returns True when timer 1 has run down 
    
 end Finrod.Timer;
 

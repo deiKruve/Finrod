@@ -102,15 +102,17 @@ package body Finrod.Thread is
    is
       Job_Entry : Job_Entry_P_Type;
    begin
-      loop
-	 Timer.Start_Timer;---------------------------
+      -- maybe we only do one scan at a time so if
+      -- the stack contains fsm's they execute only once per scan
+      --loop
+	 Timer.Start_Timer;---------------------------for testing
 	 Job_Entry    := Job_List;
 	 while Job_Entry /= null loop
 	    Job_Entry.Job.all;
 	    Job_Entry := Job_Entry.Next;
 	 end loop;
-	 Timer.Stop_Timer;-----------------------------
-      end loop; -- this hangs when no job;
+	 Timer.Stop_Timer;-----------------------------for testing
+      --end loop; -- this hangs when no job;
    end Scan;
    
    

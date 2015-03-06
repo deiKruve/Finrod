@@ -106,6 +106,18 @@ package body Finrod.Board is
 	 --Apb1rst_Tmp  : Rcc.APB1RST_Register := R.Rcc.APB1RSTR;
 	 Apb2rst_Tmp  : Rcc.APB2RST_Register := R.Rcc.APB2RSTR;
       begin
+	 Ahb1rst_Tmp.ETHMAC   := Rcc.Off; -- pulse it, according to cube
+	 Ahb1rst_Tmp.DMA1     := Rcc.Off;
+	 Ahb1rst_Tmp.DMA2     := Rcc.Off;
+	 Ahb1rst_Tmp.GPIOA    := Rcc.Off;
+	 Ahb1rst_Tmp.GPIOB    := Rcc.Off;
+	 Ahb1rst_Tmp.GPIOC    := Rcc.Off;
+	 Ahb1rst_Tmp.GPIOG    := Rcc.Off;
+	 R.Rcc.AHB1RSTR       := Ahb1rst_Tmp;
+	 Apb2rst_Tmp.Uart1    := Rcc.Off;
+	 Apb2rst_Tmp.Uart6    := Rcc.Off;
+	 R.Rcc.APB2RSTR       := Apb2rst_Tmp;
+	 
 	 Ahb1rst_Tmp.ETHMAC   := Rcc.Reset;
 	 Ahb1rst_Tmp.DMA1     := Rcc.Reset;
 	 Ahb1rst_Tmp.DMA2     := Rcc.Reset;
@@ -114,7 +126,7 @@ package body Finrod.Board is
 	 Ahb1rst_Tmp.GPIOC    := Rcc.Reset;
 	 Ahb1rst_Tmp.GPIOG    := Rcc.Reset;
 	 --Apb1rst_Tmp.
-	 Apb2rst_Tmp.Uart1    := Rcc.Reset; -- reset the discovery channel
+	 Apb2rst_Tmp.Uart1    := Rcc.Reset; -- reset the discovery channel if needed
 	 Apb2rst_Tmp.Uart6    := Rcc.Reset;
 	 -- write to hardware
 	 R.Rcc.AHB1RSTR       := Ahb1rst_Tmp;
@@ -322,10 +334,10 @@ package body Finrod.Board is
 	 R.GPIOg.Afrh          := GAfrh_Tmp;
       end;
       ----------------------------------------
-      -- init the usart and its dma:
+      -- init the usart and its dma, so we have a terminal
       Finrod.Sermon.Init_Usart6;
       --,init the ethernet with dma and ptp
-      Finrod.Net.Eth.Init_Ethernet;
+      -- not here !! Finrod.Net.Eth.Init_Ethernet;
    end Init_Pins;
    
   
@@ -368,10 +380,10 @@ package body Finrod.Board is
      return PHY_Address;
   end Get_PHY_Address;
   
-  function Get_PHY_Mspeed return Stm.Bits_3;
+  function Get_PHY_Mspeed return Stm.Bits_3
   is
   begin
-     return PHY_MSpeed
+     return PHY_MSpeed;
   end Get_PHY_Mspeed;
      
   

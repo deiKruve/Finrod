@@ -44,11 +44,11 @@
 -- Each Board can contain the Board ID that is set up on the hardware.
 
 
-with STM32F4;
+with STM32F4.o7xx.Eth;
 
 package Finrod.Board is
    
-   subtype Board_Id is Natural;
+   subtype Board_Id    is Natural;
    subtype Mac_Address is STM32F4.Bits_48;
    subtype Ip_Address  is STM32F4.Bits_32;
    
@@ -77,10 +77,10 @@ package Finrod.Board is
    function Get_Bcast_Address return Mac_Address with Inline;
    -- returns the system-lan's broadcast address;
    
-   function Get_PHY_Address return Stm.Bits_3 with Inline;
+   function Get_PHY_Address return STM32F4.Bits_5 with Inline;
    -- returns the harware PHY address;
    
-   function Get_PHY_Mspeed return STM32F4.o7xx.Eth.CR_Div102 with Inline;
+   function Get_PHY_Mspeed return STM32F4.Bits_3 with Inline;
    --  returns the PHY service bus speed;
    
    procedure Set_Id (Id : Board_Id) with Inline;
@@ -125,7 +125,7 @@ private
    PHY_Address : constant Stm32F4.Bits_5    := 0;
    -- harware PHY address as strapped on the Olimex board;
    
-   PHY_mSpeed   : constant STM32F4.o7xx.Eth  := STM32F4.o7xx.Eth.CR_Div102;
+   PHY_mSpeed   : constant STM32F4.Bits_3  := STM32F4.o7xx.Eth.CR_Div102;
    --  PHY mdio clock. 
    --  change this when your board runs at a different HCK from 168MHz
    

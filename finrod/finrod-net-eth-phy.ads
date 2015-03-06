@@ -2,7 +2,7 @@
 --                                                                          --
 --                            FINROD COMPONENTS                             --
 --                                                                          --
---                       F I N R O D . N M T _ I N I T                      --
+--                    F I N R O D . N E T . E T H . P H Y                   --
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
@@ -27,53 +27,44 @@
 --                                                                          --
 ------------------------------------------------------------------------------
 --
--- the first initialization of the app
---
--- this is a state machine. It works as described in finrod-thread.ads
--- and section 7.1.2 of EPSG DSP 301 V1.2.0
---
+-- this is the finrod ethernet PHY interface
+-- it serves to initialize the PHY;
+-- and perhaps poll for errors (after the interrupt staatus says something is wrong)
+-- 
 
-package Finrod.Nmt_Init is
+
+package Finrod.Net.Eth.PHY is
+   pragma Elaborate_Body;
    
-   type State_Selector_Type is (Nmt_Powered,
-				--Nmt_Gs_Initialisation, -- baroque austrians
-				Nmt_Initialising,
-				Nmt_Reset_Phy,
-				Nmt_Reset_Application,
-				Nmt_Reset_Communication,
-				Nmt_Wait_Communication,
-				Nmt_Reset_Configuration,
-				Nmt_ready);
+   type State_Selector_Type is (Phy_Idle,
+				Phy_Reset,
+				Phy_Wait1,
+				Phy_Init1,
+				Phy_Init2,
+				Phy_Ask_Error,
+				Phy_Wait2,
+				Phy_Ready);
    
-   -- dont need this -- procedure Fsm;
-   -- the init state machine
-   -- insert it into the run thread to srt the board. or!????
-   -- i think we will just start it at elaboration time;
-   -- at the moment it is not threaded, just a loop
+   type Error_Type is (No_Error,
+		       Remote_Fault_Detected,
+		       Link_Down);
    
-   procedure Reset;
-   -- resets to Nmt_Initialising
-   -- and NOT inserts this fsm onto the jobstack.
-   -- this is where the machine should start on power up
-   -- and it will, through the elaboration of the body.
-   -- check this sequence though
+   function State return State_Selector_Type with inline;
+   -- when the initialization is done 'State' will return 'Phy_Ready'.
    
-   procedure Reset (State : State_Selector_Type);
-   -- resets to State
-   -- meant to turn back the clock in case of some error
-   -- carefully look at the state sequence when you decide on this.
-   --
-   -- this should also invalidate the job stack since:
-   -- a. any scan has run its course, although some jobs might be suspended
-   --    in mid air.
-   -- b. we cant have statemachine jobs still executing when we reset the 
-   --    application.
-   --
-   -- An immediate consequence is that it must be safe to enter into any of 
-   -- the states, and restart from there.
-   -- Any jobs started in an older scan (i.e. not part of the warm reset) 
-   -- must either stay in the state they were at the warm reset, 
-   -- or they must be able to run on to completion without any statemachine,
-   -- or they must be included from scratch in this reset sequence.
+   procedure Reset with inline;
+   -- starts the PHY initialization procedure from a soft reset.
+   -- it will put the PHY's init fsm on the job stack for executing 1 pass
+   -- every scan period.
+   -- once finished the fsm will disappear from the jobstack and 
+   -- the state selector will be at ready.
    
-end Finrod.Nmt_Init;
+   procedure Ask_Error;
+   -- asks the PHY to reveal its status.
+   -- After 'State' returns 'Phy_Ready' the error can be gotten with 
+   -- 'Which_Error'
+   
+   function Which_Error return Error_Type with Inline;
+   -- will return the Error_Type;
+   
+end  Finrod.Net.Eth.PHY;
