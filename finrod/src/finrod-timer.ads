@@ -7,13 +7,6 @@ with STM32F4;
 
 package Finrod.Timer is
    
-   --pragma Warnings (Off, "*internal GNAT unit");
-   --subtype Time_Interval is Integer;
-   -- I think this is in nanoseconds, but do check
-   -- units: 1 masterclock period = 5.95238095238e-9 seconds
-   -- for a 168_000_000 clock.
-   
-   
    type Time_Type is record
       Seconds : Stm32F4.Bits_32;
       Subsecs : Stm32F4.Bits_32;

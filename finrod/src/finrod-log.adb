@@ -29,13 +29,13 @@
 --
 -- the error and log handling package
 
-with STM32F4;
+--with STM32F4;
 with Finrod.Timer;
 with Finrod.Sermon;
 
 package body Finrod.Log is
    
-   package Stm  renames STM32F4;
+   --package Stm  renames STM32F4;
    package Tim  renames Finrod.Timer;
    
    --------------------------------
@@ -66,7 +66,7 @@ package body Finrod.Log is
    -- by the various init packages.
    procedure log_Error (T : Error_Type; S : String)
    is
-      Si : Positive := S'Last;
+      Si : constant Positive := S'Last;
    begin
       Logger (Log_Index).Time_Stamp        := Tim.Read_Time;
       Logger (Log_Index).Species           := T;
@@ -81,7 +81,7 @@ package body Finrod.Log is
    -- logs some event described by the string.
    procedure Log (S : String)
    is
-      Si : Positive := S'Last;
+      Si : constant Positive := S'Last;
    begin
       Logger (Log_Index).Time_Stamp        := Tim.Read_Time;
       Logger (Log_Index).Species           := No_Error;
@@ -131,7 +131,7 @@ package body Finrod.Log is
 	   (Tim.Image (Logger (Index).Time_Stamp) & 
 	      Logger (Index).S (Logger (Index).S'First .. Logger (Index).Slast));
 	end if;
-	Log_Index := Log_Index + 1;
+	Index := Index + 1;
       end loop;
    end Print_Log;
    

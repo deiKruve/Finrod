@@ -55,6 +55,7 @@
 
 with System.Storage_Elements;
 with Finrod.Board;
+with Finrod.Net.Eth;
 with Finrod.Net.Arptable;
 with Finrod.Sermon;
 
@@ -63,6 +64,7 @@ package body Finrod.Net.Arp is
    package Sse       renames System.Storage_Elements;
    package Board     renames Finrod.Board;
    package Arp_Table renames Finrod.Net.Arptable;
+   package Eth       renames Finrod.Net.Eth;
    package V24       renames Finrod.Sermon;
    --------------------------------
    -- constants,                 --
@@ -124,7 +126,7 @@ package body Finrod.Net.Arp is
       pragma Import (Ada, Arr);
    begin
       declare -- hardcoded for speed
-	 S : String := 
+	 S : constant String := 
 	   "Arp " &
 	   Arr (1)'Img & ' ' &
 	   Arr (2)'Img & ' ' & 
@@ -196,7 +198,7 @@ package body Finrod.Net.Arp is
 	 F.Tha  := F.Srce;
 	 F.Dest := F.Srce;
 	 F.Srce := Board.Get_Mac_Address;
-	 Stash_For_Sending (Ba, Bbc);
+	 Eth.Stash_For_Sending (Ba, Bbc);
 	 if Display_Xframes > 0 then Show (Ba); end if;
 	 return Stashed_For_Sending;
 	 
@@ -216,12 +218,12 @@ package body Finrod.Net.Arp is
 	 F.Tha  := F.Sha;
 	 F.Sha  := F.Srce;
 	 declare
-	    FSpa   : Stm.Bits_32 := F.Tpa;
-	    Ftpa   : Stm.Bits_32 := F.Spa;
+	    FSpa   : constant Stm.Bits_32 := F.Tpa;
+	    Ftpa   : constant Stm.Bits_32 := F.Spa;
 	 begin
 	    F.Tpa  := Ftpa;
 	    F.Spa  := Fspa;
-	    Stash_For_Sending (Ba, Bbc);
+	    Eth.Stash_For_Sending (Ba, Bbc);
 	    if Display_Xframes > 0 then Show (Ba); end if;
 	    return Stashed_For_Sending;
 	 end;
@@ -246,7 +248,7 @@ package body Finrod.Net.Arp is
 			      Tpa : Stm.Bits_32       := Ip_Null)
 			     return Test_Reply_Type
    is
-      F : BArp_Packet_Access_Type := new BArp_Packet;
+      F : constant BArp_Packet_Access_Type := new BArp_Packet;
    begin
       F.Dest  := Mac_Xmas;
       F.Srce  := Board.Get_Mac_Address;
@@ -275,7 +277,7 @@ package body Finrod.Net.Arp is
 	    F.Tpa   := F.Spa; -- to indicate an anouncement.
 	    --F.Tha := Mac_null;
       end case;
-      Stash_For_Sending (F.all'Address , BArp_Packet_Length);
+      Eth.Stash_For_Sending (F.all'Address , BArp_Packet_Length);
       return Stashed_For_Sending;
 
    end Send_Arp_Request;

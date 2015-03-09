@@ -32,7 +32,7 @@
 -- It works as described in finrod-thread.ads
 --
 
-with System;
+--with System;
 with Finrod.Board;
 with Finrod.Sermon;
 with Finrod.Thread;
@@ -77,12 +77,12 @@ package body Finrod.Spy is
       case Fsm_State is
 	 when Spy_Health_Check            =>
 	    if V24.Uart_Error then
-	       V24.Init_Usart1;
+	       V24.Init_Usart6;
 	       Error_Counter := Error_Counter + 8;
 	       return;
 	    end if;
 	    if V24.Dma2_Error then--------------------------------discovery
-	       V24.Init_Usart1;
+	       V24.Init_Usart6;
 	       Error_Counter := Error_Counter + 8;
 	       return;
 	    end if;
@@ -121,28 +121,28 @@ package body Finrod.Spy is
 	    if V24.Serial_Recd_Data_A.all (First .. First + 4) = 
 	      "rtime" then
 	       V24.Send_String 
-		 (Timer.Time_Interval'Image (Timer.Report_Min_Duration) & 
+		 (Timer.Image (Timer.Report_Min_Duration) & 
 		    "   " & 
-		    Timer.Time_Interval'Image (Timer.Report_Max_Duration) &
+		    Timer.Image (Timer.Report_Max_Duration) &
 		    " clock ticks.");
 	       Fsm_State := Spy_Rebase_Incoming;
 	    else Fsm_State := Spy_Echo_Junk;
 	    end if;
 	    
 	 when Spy_Try_Parse_Arp_Req       =>
-	    if V24.Serial_Recd_Data_A.all (First .. First + 5) = 
+	    if V24.Serial_Recd_Data_A.all (First .. First + 3) = 
 	      "xarp" then
-	       if V24.Serial_Recd_Data_A.all (First + 6 .. First + 8) = 
+	       if V24.Serial_Recd_Data_A.all (First + 4 .. First + 6) = 
 		 "req" then
 		  Dummy_Reply := Arp.Send_Arp_Request 
 		    (Arp.Arp_Request, Board.Get_Master_Ip_Address);
 		  Fsm_State := Spy_Rebase_Incoming;
-	       elsif V24.Serial_Recd_Data_A.all (First + 6 .. First + 9) =
+	       elsif V24.Serial_Recd_Data_A.all (First + 4 .. First + 7) =
 		 "prob" then
 		  Dummy_Reply := Arp.Send_Arp_Request 
 		    (Arp.Arp_Probe, Board.Get_Ip_Address);
 		  Fsm_State := Spy_Rebase_Incoming;
-	       elsif V24.Serial_Recd_Data_A.all (First + 6 .. First + 8) =
+	       elsif V24.Serial_Recd_Data_A.all (First + 4 .. First + 6) =
 		 "ann" then
 		  Dummy_Reply := Arp.Send_Arp_Request 
 		    (Arp.Arp_Announce, Board.Get_Ip_Address);

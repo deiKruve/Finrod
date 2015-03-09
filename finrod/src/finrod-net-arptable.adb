@@ -61,7 +61,7 @@ package body Finrod.Net.Arptable is
    procedure Stash (Sha : Stm.Bits_48; 
 		    Spa : Stm.Bits_32)
    is
-      Arp_Entry : Arp_Entry_P_Type := new Arp_Entry_Type;
+      Arp_Entry : constant Arp_Entry_P_Type := new Arp_Entry_Type;
    begin
       Arp_Entry.Mac  := Sha;
       Arp_Entry.Ip   := Spa;
@@ -78,7 +78,7 @@ package body Finrod.Net.Arptable is
       while Stash_Entry /= null loop
 	 if not Exists (Stash_Entry.Mac) then
 	    declare
-	       Arp_Entry : Arp_Entry_P_Type := new Arp_Entry_Type;
+	       Arp_Entry : constant Arp_Entry_P_Type := new Arp_Entry_Type;
 	    begin
 	       Arp_Entry.Mac  := Stash_Entry.Mac;
 	       Arp_Entry.Ip   := Stash_Entry.Ip;
@@ -99,7 +99,7 @@ package body Finrod.Net.Arptable is
    begin
       if not Exists (Sha) then
 	 declare
-	    Arp_Entry : Arp_Entry_P_Type := new Arp_Entry_Type;
+	    Arp_Entry : constant Arp_Entry_P_Type := new Arp_Entry_Type;
 	 begin
 	    Arp_Entry.Mac  := Sha;
 	    Arp_Entry.Ip   := Spa;

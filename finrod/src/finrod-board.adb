@@ -39,7 +39,7 @@ with STM32F4.O7xx.Rcc;
 with STM32F4.Gpio;
 
 with Finrod.Sermon;
-with Finrod.Net.Eth;
+--with Finrod.Net.Eth;
 
 package body Finrod.Board is
    

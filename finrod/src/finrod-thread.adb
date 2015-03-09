@@ -30,7 +30,7 @@
 -- the jobber structure of finrod
 --
 
-with Ada.Unchecked_Deallocation;
+-- with Ada.Unchecked_Deallocation;
 
 with Finrod.Timer;
 

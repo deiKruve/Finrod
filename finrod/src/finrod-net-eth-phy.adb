@@ -56,7 +56,7 @@ package body Finrod.Net.Eth.PHY is
    function Phy_Available return Boolean
    is
       use type Stm.Bits_1;
-      MACMIIAR_Tmp : Eth.MACMIIAR_Register := R.Eth_Mac.MACMIIAR;
+      MACMIIAR_Tmp : constant Eth.MACMIIAR_Register := R.Eth_Mac.MACMIIAR;
    begin
       if MACMIIAR_Tmp.Mb = Eth.Clear then
 	 return True;
@@ -204,7 +204,7 @@ package body Finrod.Net.Eth.PHY is
    function Which_Error return Error_Type
    is 
       use type Stm.Bits_16;
-      Md : Stm.Bits_16 := R.Eth_Mac.MACMIIDR.Md;
+      Md : constant Stm.Bits_16 := R.Eth_Mac.MACMIIDR.Md;
    begin
       If (MD and 2#0000_0000_0010_0000#) /= 0  then
 	 return Remote_Fault_Detected;

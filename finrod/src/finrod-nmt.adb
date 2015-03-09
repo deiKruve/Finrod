@@ -134,10 +134,10 @@ package body Finrod.Nmt is
 	 
 	 -- error handling:
 	 declare 
-	    Err : Log.Error_Type := Log.Check_Error;
+	    Err : constant Log.Init_Error_Type := Log.Check_Error;
 	 begin
-	    if Err in Log.Init_Error_Type then
-	      case  Log.Init_Error_Type (Err) is
+	    if (Err'Valid) then
+	      case  Err is
 		 when Log.Init_Error_Initialize   =>
 		    Fsm_State := Nmt_Initialising;
 		 when Log.Init_Error_Reset_Phy    =>

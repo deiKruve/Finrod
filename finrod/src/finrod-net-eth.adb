@@ -205,7 +205,7 @@ package body Finrod.Net.Eth is
       use type Stm.Bits_48;
       use type Ifce.Unsigned_64;
       MACA0HR_Tmp : Eth.MACA0HR_Register := R.Eth_Mac.MACA0HR;
-      Address  : Ifce.Unsigned_64  := Ifce.Unsigned_64 (Board.Get_Mac_Address);
+      Address  : constant Ifce.Unsigned_64  := Ifce.Unsigned_64 (Board.Get_Mac_Address);
    begin
       R.Eth_Mac.MACA0LR  := Stm.Bits_32 (Address);
       MACA0HR_Tmp.MACA0H := Stm.Bits_16 (Ifce.Shift_Right (Address, 32));
@@ -215,10 +215,10 @@ package body Finrod.Net.Eth is
       -- set broadcast address
       declare 
 	 use type Stm.Bits_6;
-	 use type Stm.Bits_48;
-	 use type Ifce.Unsigned_64;
+	 --use type Stm.Bits_48;
+	 --use type Ifce.Unsigned_64;
 	 MACA1HR_Tmp : Eth.MACA1HR_Register := R.Eth_Mac.MACA1HR;
-	 Address  : Ifce.Unsigned_64  := Ifce.Unsigned_64 (Board.Get_Bcast_Address);
+	 Address  : constant Ifce.Unsigned_64  := Ifce.Unsigned_64 (Board.Get_Bcast_Address);
       begin
 	 R.Eth_Mac.MACA1LR  := Stm.Bits_32 (Address);
 	 MACA1HR_Tmp.MACA1H := Stm.Bits_16 (Ifce.Shift_Right (Address, 32));

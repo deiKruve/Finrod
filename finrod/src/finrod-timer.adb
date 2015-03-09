@@ -1,14 +1,15 @@
 
-with System.Unsigned_Types;
+--with System.Unsigned_Types;
 with STM32F4.o7xx.Eth;
 with STM32F4.O7xx.Registers;
-with Img_Uns;
+--with Img_Uns;
 
-package body Timer is
+package body Finrod.Timer is
    package Stm renames STM32F4;
    package Eth renames STM32F4.o7xx.Eth;
    package R   renames STM32F4.O7xx.Registers;
-   package Unsigned renames Img_Uns;
+   --package Unsigned renames Img_Uns;
+   
    --------------------------------
    -- constants,                 --
    -- definitions and local vars --
@@ -65,8 +66,10 @@ package body Timer is
    function Image (T : Time_Type) return String
    is
       S : constant String := 
-	Unsigned.Image (System.Unsigned_Types.Unsigned (T.Seconds)) & "." & 
-	Unsigned.Image (System.Unsigned_Types.Unsigned (T.Subsecs));
+	--Unsigned.Image (System.Unsigned_Types.Unsigned (T.Seconds)) & "." & 
+	--Unsigned.Image (System.Unsigned_Types.Unsigned (T.Subsecs));
+	Stm.Bits_32'Image (T.Seconds) & "." & 
+	Stm.Bits_32'Image (T.Subsecs);
    begin
       return S;
    end Image;
@@ -222,4 +225,4 @@ package body Timer is
 begin
    Reset;
    Init;
-end Timer;
+end Finrod.Timer;
