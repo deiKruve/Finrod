@@ -30,7 +30,7 @@
 
 with STM32F4;
 with Finrod.Board;
-with Finrod.Nmt_Init;
+with Finrod.Nmt;
 with Finrod.App;
 
 package body Sample_App is
@@ -45,6 +45,6 @@ package body Sample_App is
    end Init;
    
 begin
-   Finrod.App.Init := Init'Access; -- uplink to the library for initing
+   Finrod.Nmt.App_Init := Init'Access; -- uplink to the library for initing
 				   -- from there
 end Sample_App;

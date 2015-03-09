@@ -37,8 +37,10 @@ with Finrod.Net.Eth.PHY;
 with Finrod.Thread;
 with Finrod.Board;
 with Finrod.Spy;
+with Finrod.Timer;
+with Finrod.Log;
 
-package body Finrod.Nmt_Init is
+package body Finrod.Nmt is
    
    package Thr renames Finrod.Thread;
    package Eth renames Finrod.Net.Eth;
@@ -52,6 +54,12 @@ package body Finrod.Nmt_Init is
    
    Fsm_State : State_Selector_Type := Nmt_Powered;
    
+   
+   ------------------------
+   --  public interface  --
+   ------------------------
+   
+   
    -- there was no real need for an fsm here but since this is the theme
    -- of the project, it was also build in that shape.
    -- therefor the case discriminator in enclosed in a while loop
@@ -61,58 +69,92 @@ package body Finrod.Nmt_Init is
       use type Phy.State_Selector_Type;
    begin
       while Fsm_State /= Nmt_Ready loop
-      case Fsm_State is
-	 when Nmt_Powered             =>
-	    Fsm_State := Nmt_Initialising;
-	    
-	 when Nmt_Initialising        =>
-	    
-	    -- Initialize the basic board with comms, timer, etc
-	    -- insofar not done on the ada startup layer
-	    Finrod.Board.Init_Pins;
-	    Spy.Insert_Spy; -- so we have a V24 interface.
-	    
-	    -- board.set_macaddress         -- if special
-	    -- board.set_ip_address         -- if special
-	    
-	    -- reads the hw id and applies it to the net addresses
-	    Finrod.Board.Set_Id (1); 
-	    -- reads the hw id and applies it to the net addresses
-	    
-	    -- board.set_master_ip_address  -- if special
-	    Fsm_State := Nmt_Reset_Phy;
-	 when Nmt_Reset_Phy           =>
-	    PHY.Reset;
-	    Thr.Scan;
-	    Thr.Scan; -- so we are waiting now for the reset timeout
-	    Fsm_State := Nmt_Reset_Application;
-	    
-	 when Nmt_Reset_Application   =>
-	    null;
-	    -- insert app init here
-	    Thr.Scan;
-	    Fsm_State := Nmt_Reset_Communication;
-	 when Nmt_Reset_Communication =>
-	    Finrod.Net.Eth.Reset;  -- resets the eth structure
-	    Thr.Scan;
-	    Fsm_State := Nmt_Wait_Communication;
-	 when Nmt_Wait_Communication   =>
-	    Thr.Scan;
-	    if PHY.State = PHY.Phy_Ready and Eth.State = Eth.Eth_Ready then
-	       Fsm_State := Nmt_Reset_Configuration;
-	    end if;
-	 when Nmt_Reset_Configuration =>  -- Could Be Used As A Restart After parms
-					  -- have been changed trough the net.
-	    null;
-	    Thr.Scan;
+	 case Fsm_State is
+	    when Nmt_Powered             =>
+	       Fsm_State := Nmt_Initialising;
+	       
+	    when Nmt_Initialising        =>
+	       -- Initialize the basic board with comms, timer, etc
+	       -- insofar not done on the ada startup layer
+	       Finrod.Board.Init_Pins;
+	       Timer.Init;
+	       Spy.Insert_Spy; -- so we have a V24 interface.
+	       
+	       -- board.set_macaddress         -- if special
+	       -- board.set_ip_address         -- if special
+	       
+	       -- reads the hw id and applies it to the net addresses
+	       Finrod.Board.Set_Id (1); 
+	       -- reads the hw id and applies it to the net addresses
+	       
+	       -- board.set_master_ip_address  -- if special
+	       
+	       Log.Log ("finished Nmt_Initialising.");
+	       Fsm_State := Nmt_Reset_Phy;
+	       
+	    when Nmt_Reset_Phy           =>
+	       PHY.Reset;
+	       Thr.Scan;
+	       Thr.Scan; -- so we are waiting now for the reset timeout
+	       Fsm_State := Nmt_Reset_Application;
+	       
+	    when Nmt_Reset_Application   =>
+	       -- init the application.
+	       App_Init.all;
+	       Thr.Scan;
+	       Log.Log ("finished PHY and application init.");
+	       Fsm_State := Nmt_Reset_Communication;
+	    when Nmt_Reset_Communication =>
+	       Finrod.Net.Eth.Reset;  -- resets the eth structure
+	       Thr.Scan;
+	       Fsm_State := Nmt_Wait_Communication;
+	       
+	    when Nmt_Wait_Communication   =>
+	       Thr.Scan;
+	       if PHY.State = PHY.Phy_Ready and Eth.State = Eth.Eth_Ready then
+		  Log.Log ("communication ok now.");
+		  Fsm_State := Nmt_Reset_Configuration;
+	       end if;
+	       
+	    when Nmt_Reset_Configuration =>  
+	       -- Could Be Used As A Restart After parms
+	       -- have been changed trough the net.
+	       null;
+	       Thr.Scan;
 
-	    --Thr.Delete_Job (Fsm'Access); -- happens only once cause then fsm 
-					 -- does not get executed anymore
-	    Fsm_State := Nmt_Ready;
-	 when Nmt_Ready          =>
-	    null;
-      end case;
-   end loop;
+	       --Thr.Delete_Job (Fsm'Access); -- happens only once cause then fsm 
+	       -- does not get executed anymore
+	       
+	       Log.Log ("Initialization Stage completed succesfully.");
+	       Fsm_State := Nmt_Ready;
+	       
+	    when Nmt_Ready          =>
+	       null;----------------------------------carry on here
+	 end case;
+	 
+	 -- error handling:
+	 declare 
+	    Err : Log.Error_Type := Log.Check_Error;
+	 begin
+	    if Err in Log.Init_Error_Type then
+	      case  Log.Init_Error_Type (Err) is
+		 when Log.Init_Error_Initialize   =>
+		    Fsm_State := Nmt_Initialising;
+		 when Log.Init_Error_Reset_Phy    =>
+		    Fsm_State := Nmt_Reset_Phy;
+		 when Log.Init_Error_Reset_App    =>
+		    Fsm_State := Nmt_Reset_Application;
+		 when Log.Init_Error_Reset_Comms  =>
+		    Fsm_State := Nmt_Reset_Communication;
+		 when Log.Init_Error_Reset_Config =>
+		    Fsm_State := Nmt_Reset_Configuration;
+		 when others                        =>
+		    null;
+	      end case;
+	    end if;
+	 end;
+	 
+      end loop;
    end Fsm;
    
    
@@ -152,4 +194,4 @@ package body Finrod.Nmt_Init is
 begin
    Reset;
    -- Thr.Scan;
-end Finrod.Nmt_Init;
+end Finrod.Nmt;

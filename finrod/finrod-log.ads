@@ -2,7 +2,7 @@
 --                                                                          --
 --                            FINROD COMPONENTS                             --
 --                                                                          --
---                         F I N R O D . E R R O R                          --
+--                           F I N R O D . L O G                            --
 --                                                                          --
 --                                 S p e c                                  --
 --                                                                          --
@@ -27,7 +27,7 @@
 --                                                                          --
 ------------------------------------------------------------------------------
 --
--- the error handling package
+-- the error and log handling package
 --
 -- it looks as if every major state machine needs its own error handling and that
 -- for ease of programming they are all collected here, although conceptially
@@ -74,10 +74,9 @@
 --
 
 
-
-package Finrod.Error is
+package Finrod.Log is
    
-   type Error_Type is (Init_No_Error,
+   type Error_Type is (No_Error,
 		       Init_Error_Initialize,
 		       Init_Error_Reset_Phy,
 		       Init_Error_Reset_App,
@@ -86,7 +85,7 @@ package Finrod.Error is
    -- the error type indicates the action to be taken.
    
    subtype Init_Error_Type is 
-     Error_Type range Init_No_Error .. Init_Error_Reset_Config;
+     Error_Type range No_Error .. Init_Error_Reset_Config;
    --  Init_Error_Initialize   : complete warm reset of the board.
    --  Init_Error_Reset_Phy    : pins and uart are assumed still ok.
    --  Init_Error_Reset_App    :  also phy is assumed ok.
@@ -94,15 +93,26 @@ package Finrod.Error is
    --  Init_Error_Reset_Config :  also comms (ethernet oid) are assumed ok.
    --                                  only the configuration is reset.
    
-   procedure Report_Error (T : Error_Type; S : String);
+   procedure log_Error (T : Error_Type; S : String);
    -- errors in the init section are reported with
    -- the Init_Error_Type and a descriptive string
    -- by the various init packages.
    
+   procedure Log (S : String);
+   -- logs some event described by the string.
+   
    function Check_Error return Error_Type;
-   -- returns any error for the caller to act upon.
+   -- returns the last error for the caller to act upon.
    -- check error could trigger any printing of the descriptive string to 
    -- the terminal.
-   -- 
+   -- WHO wipes the error after action????????????
    
-end Finrod.Error;
+   procedure Null_Last_Error with inline;
+   -- null the last error.
+   -- it is left in the log though
+   
+   procedure Print_Log;
+   -- prints the last 'Log_index_type range' (32 at the moment) log entries
+   -- if there are any.
+   
+end Finrod.Log;

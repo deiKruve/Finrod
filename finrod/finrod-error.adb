@@ -2,7 +2,7 @@
 --                                                                          --
 --                            FINROD COMPONENTS                             --
 --                                                                          --
---                         F I N R O D . E R R O R                          --
+--                           F I N R O D . L O G                            --
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
@@ -27,9 +27,21 @@
 --                                                                          --
 ------------------------------------------------------------------------------
 --
--- the error handling package
+-- the error and log handling package
 
-package body Finrod.Error is
+package body Finrod.Log is
+   
+   --------------------------------
+   -- constants,                 --
+   -- definitions and local vars --
+   --------------------------------
    
    
-end Finrod.Error;
+   
+   ------------------------
+   --  public interface  --
+   ------------------------
+   
+   
+   
+end Finrod.Log;

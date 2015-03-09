@@ -76,4 +76,7 @@ package Finrod.Nmt is
    -- or they must be able to run on to completion without any statemachine,
    -- or they must be included from scratch in this reset sequence.
    
+   type App_Init_Type is access procedure;
+   App_Init : App_Init_Type;
+   
 end Finrod.Nmt;
