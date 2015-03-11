@@ -42,7 +42,9 @@ package Finrod.Nmt is
 				Nmt_Reset_Application,
 				Nmt_Reset_Communication,
 				Nmt_Wait_Communication,
+				Nmt_Wait_Communication_Ok,
 				Nmt_Reset_Configuration,
+				Nmt_Wait_Configuration_Ok,
 				Nmt_ready);
    
    -- dont need this -- procedure Fsm;

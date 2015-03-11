@@ -30,7 +30,7 @@
 -- this is the top of the finrod ethernet interface
 --
 
-with Finrod.Net.Eth;
+--with Finrod.Net.Eth;
 
 package body Finrod.Net is
    --package Eth renames  Finrod.Net.Eth; ---- automagic in ada
@@ -43,7 +43,7 @@ package body Finrod.Net is
    -- poll for a received frame and determine the type.
    -- stash any split 2nd halves
    function Poll_Received return Poll_R_Reply_Type
-   is (Eth.Poll_Received);
+   is (no);--(Eth.Poll_Received);
    
    
    -- since we have a strictly sequential comms pattern we
@@ -51,7 +51,7 @@ package body Finrod.Net is
    -- in case of error, normally there is a re-transmission 
    -- after the error has been cleared.
    function Poll_Xmit_Completed return Poll_X_Reply_Type
-   is (Eth.Poll_Xmit_Completed);
+   is (ongoing);--(Eth.Poll_Xmit_Completed);
    
    
    -- execute the next stashed job, 

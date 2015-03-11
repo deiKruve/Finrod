@@ -70,10 +70,10 @@ package body Finrod.Nmt is
    begin
       while Fsm_State /= Nmt_Ready loop
 	 case Fsm_State is
-	    when Nmt_Powered             =>
+	    when Nmt_Powered                    =>
 	       Fsm_State := Nmt_Initialising;
 	       
-	    when Nmt_Initialising        =>
+	    when Nmt_Initialising               =>
 	       -- Initialize the basic board with comms, timer, etc
 	       -- insofar not done on the ada startup layer
 	       Finrod.Board.Init_Pins;
@@ -92,13 +92,13 @@ package body Finrod.Nmt is
 	       Log.Log ("finished Nmt_Initialising.");
 	       Fsm_State := Nmt_Reset_Phy;
 	       
-	    when Nmt_Reset_Phy           =>
+	    when Nmt_Reset_Phy                  =>
 	       PHY.Reset;
 	       Thr.Scan;
 	       Thr.Scan; -- so we are waiting now for the reset timeout
 	       Fsm_State := Nmt_Reset_Application;
 	       
-	    when Nmt_Reset_Application   =>
+	    when Nmt_Reset_Application          =>
 	       -- init the application.
 	       App_Init.all;
 	       Thr.Scan;
@@ -109,26 +109,33 @@ package body Finrod.Nmt is
 	       Thr.Scan;
 	       Fsm_State := Nmt_Wait_Communication;
 	       
-	    when Nmt_Wait_Communication   =>
+	    when Nmt_Wait_Communication         =>
 	       Thr.Scan;
-	       if PHY.State = PHY.Phy_Ready and Eth.State = Eth.Eth_Ready then
+	       if PHY.State = PHY.Phy_Ready and 
+		 Eth.State = Eth.Eth_Ready_To_Start then
+		  Finrod.Net.Eth.Eth_Start; -- enable the xmitter and receiver
+		  Fsm_State := Nmt_Wait_Communication_Ok;
+	       end if;
+	       Thr.Scan;
+	       
+	    when Nmt_Wait_Communication_Ok      =>
+	       if Eth.State = Eth.Eth_Ready then
 		  Log.Log ("communication ok now.");
 		  Fsm_State := Nmt_Reset_Configuration;
 	       end if;
-	       
-	    when Nmt_Reset_Configuration =>  
+	       Thr.Scan;
+	    when Nmt_Reset_Configuration        =>  
 	       -- Could Be Used As A Restart After parms
 	       -- have been changed trough the net.
 	       null;
+	       Fsm_State := Nmt_Wait_Configuration_Ok;
 	       Thr.Scan;
-
-	       --Thr.Delete_Job (Fsm'Access); -- happens only once cause then fsm 
-	       -- does not get executed anymore
 	       
+	    when Nmt_Wait_Configuration_Ok      =>  
 	       Log.Log ("Initialization Stage completed succesfully.");
 	       Fsm_State := Nmt_Ready;
 	       
-	    when Nmt_Ready          =>
+	    when Nmt_Ready                      =>
 	       null;----------------------------------carry on here
 	 end case;
 	 
@@ -137,20 +144,20 @@ package body Finrod.Nmt is
 	    Err : constant Log.Init_Error_Type := Log.Check_Error;
 	 begin
 	    if (Err'Valid) then
-	      case  Err is
-		 when Log.Init_Error_Initialize   =>
-		    Fsm_State := Nmt_Initialising;
-		 when Log.Init_Error_Reset_Phy    =>
-		    Fsm_State := Nmt_Reset_Phy;
-		 when Log.Init_Error_Reset_App    =>
-		    Fsm_State := Nmt_Reset_Application;
-		 when Log.Init_Error_Reset_Comms  =>
-		    Fsm_State := Nmt_Reset_Communication;
-		 when Log.Init_Error_Reset_Config =>
-		    Fsm_State := Nmt_Reset_Configuration;
-		 when others                        =>
-		    null;
-	      end case;
+	       case  Err is
+		  when Log.Init_Error_Initialize   =>
+		     Fsm_State := Nmt_Initialising;
+		  when Log.Init_Error_Reset_Phy    =>
+		     Fsm_State := Nmt_Reset_Phy;
+		  when Log.Init_Error_Reset_App    =>
+		     Fsm_State := Nmt_Reset_Application;
+		  when Log.Init_Error_Reset_Comms  =>
+		     Fsm_State := Nmt_Reset_Communication;
+		  when Log.Init_Error_Reset_Config =>
+		     Fsm_State := Nmt_Reset_Configuration;
+		  when others                      =>
+		     null;
+	       end case;
 	    end if;
 	 end;
 	 
@@ -190,7 +197,7 @@ package body Finrod.Nmt is
    begin
       Fsm_State := State;
    end Reset;
-         
+   
 begin
    Reset;
    -- Thr.Scan;

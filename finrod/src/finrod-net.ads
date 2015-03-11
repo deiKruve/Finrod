@@ -56,8 +56,9 @@ package Finrod.Net is
    for Frame'Scalar_Storage_Order use System.High_Order_First;
    -- its Big Endian
    
-   subtype Frame_Address is System.Address; 
-   -- note that frame addresses must skip the first 4 bytes of a record
+   subtype Frame_Address_Type is System.Address; 
+   -- used in the children of 'Frame' and a few other places.
+   -- note that frame addresses must skip the first 4 bytes of a 'Frame' record
    -- since it is a tagged record.
    
    subtype Frame_Length_Type is Stm.Bits_13;

@@ -33,6 +33,7 @@
 
 --with System;
 --with STM32F4;
+with Finrod.Timer;
 
 package Finrod.Net.Eth is
    
@@ -43,7 +44,13 @@ package Finrod.Net.Eth is
    -- some types and constants --
    ------------------------------
    
-  
+   -- the frame descriptor index types
+   -- when you need to know something about a descriptor,
+   -- pass a var of this type, with the desc nuber  (0 .. 2 at the moment)
+   -- 3 of each, until we need more
+   type Rx_Desc_Idx_Type is mod 3;
+   type Tx_Desc_Idx_Type is mod 3;
+   
    ----------------------
    -- public interface --
    ----------------------
@@ -52,7 +59,10 @@ package Finrod.Net.Eth is
    -- poll for a received frame and determine the type.
    -- stash any split 2nd halves
    
-   function Poll_Xmit_Completed return Poll_X_Reply_Type;
+   function Poll_Xmit_Completed (Dix : in  Tx_Desc_Idx_Type;
+				Time : out Timer.Time_type)
+				return Poll_X_Reply_Type;
+   -- dix is the index of the descriptor.
    -- since we have a strictly sequential comms pattern we
    -- check for completed or error.
    -- in case of error, normally there is a re-transmission 
@@ -64,23 +74,41 @@ package Finrod.Net.Eth is
    -- uncles only               --
    -------------------------------
     
-   procedure Send_Frame (Ba : Frame_Address; Bbc : Frame_Length_Type);
+   function Send_Frame (Ba  : Frame_Address_Type; 
+			Bbc : Frame_Length_Type;
+			Dix : out Tx_Desc_Idx_Type) return boolean;
    -- to send a frame build it first then pass the address and the length
    -- here for transmission.
    -- the frame can ony be released once it has been successfully sent.
-   -- lets see if this works as a queueing mechanism.
+   -- 
+   -- in Dix the descriptor index is returned for polling use.
+   -- the function returns false when 
+   -- the next descriptor in the array is still in use. 
+   -- If this were to happen the eth net quality is most likely very poor, since
+   -- there are buffers waiting to be transmitted.
+   -- use Poll_Xmit_Completed after this command to ascertain its gone.
    
-   procedure Stash_For_Sending (Ba : Frame_Address; Bbc : Frame_Length_Type);
+   
+   procedure Stash_For_Sending (Ba : Frame_Address_Type; Bbc : Frame_Length_Type);
    -- queues a frame for sending,
    -- it is meant as a stage2 repost action, which can be executed just now
    
-   procedure Send_Next;
-   -- sends the next queued item. note that normally there should be
-   -- no more than 1 item on the stack.
+   
+   function Send_Next (Dix : out Tx_Desc_Idx_Type) 
+		      return boolean;
+   -- sends the next queued item. 
+   -- Dix returns the descriptor index (can be used for polling).
+   --
+   -- note that normally there should be no more than 1 item on the stack.
    -- so this command should happen after Stash_For_Sending without any
    -- ethernet send activity in between.
+   -- the function returns false when 
+   -- the next descriptor in the array is still in use. 
+   -- If this were to happen the eth net quality is most likely very poor, since
+   -- there are buffers waiting to be transmitted.
    -- use Poll_Xmit_Completed after this command to ascertain its gone.
    
+
    
    --------------------------
    --  for initialization  --
@@ -107,7 +135,7 @@ package Finrod.Net.Eth is
    -- once finished the fsm will disappear from the jobstack and 
    -- the state selector will be at ready.
    
-   function Eth_Start return Boolean with inline;
+   procedure Eth_Start with inline;
    -- starts all ethernet facilities.
    -- if not in State 'Eth_Ready_To_Start' the function will return false.
    -- else true.

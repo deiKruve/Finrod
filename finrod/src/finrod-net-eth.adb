@@ -55,23 +55,37 @@ package body Finrod.Net.Eth is
    -- some types and constants --
    ------------------------------
    
-   -- the frame buffers
-   -- four, they are unisex, can be used for xmit and recv
-   Buf1 : Sto.Storage_Array (1 .. 1024);
-   Buf2 : Sto.Storage_Array (1 .. 1024);
-   Buf3 : Sto.Storage_Array (1 .. 1024);
-   Buf4 : Sto.Storage_Array (1 .. 1024);
+   -- the frame buffers --
    
-
-   -- the frame descriptors
-   -- 3 of each, until we need more
-   Rx_Desc_1 : Ebuf.Xl_Recv_Desc_Type;
-   Rx_Desc_2 : Ebuf.Xl_Recv_Desc_Type;
-   Rx_Desc_3 : Ebuf.Xl_Recv_Desc_Type;
-
-   Tx_Desc_1 : Ebuf.Xl_Xmit_Desc_Type;
-   Tx_Desc_2 : Ebuf.Xl_Xmit_Desc_Type;
-   Tx_Desc_3 : Ebuf.Xl_Xmit_Desc_Type;
+   -- four, they are unisex, can be used for xmit and recv
+   type Buf_Idx_Type is mod 4;
+   Buf : array (Buf_Idx_Type) of Sto.Storage_Array (1 .. 1024);
+   --  Buf1 : Sto.Storage_Array (1 .. 1024);
+   --  Buf2 : Sto.Storage_Array (1 .. 1024);
+   --  Buf3 : Sto.Storage_Array (1 .. 1024);
+   --  Buf4 : Sto.Storage_Array (1 .. 1024);
+   
+   type Frame_Store_Type;
+   type Frame_Store_P_Type is access all Frame_Store_Type;
+   type Frame_Store_Type is record
+      Buf_Idx : Buf_Idx_Type;
+      Faddr   : Frame_Address_Type;
+      Free    : Boolean;
+      Next    : Frame_Store_P_Type;
+   end record;
+   
+   Frame_Store : Frame_Store_P_Type := null; -- anchor of availabe eth frames
+   
+   
+   -- the descriptors --
+   
+   Rx_Desc_Idx : Rx_Desc_Idx_Type := 0;
+   Tx_Desc_Idx : Tx_Desc_Idx_Type := 0;
+   
+   Rx_Desc : array (Rx_Desc_Idx_type) of Ebuf.Xl_Recv_Desc_Type;
+   for Rx_Desc'Alignment use 4;
+   Tx_Desc : array (Tx_Desc_Idx_Type) of Ebuf.Xl_Xmit_Desc_Type;
+   for Tx_Desc'Alignment use 4;
    
    -- conversions 
    function Tob is new
@@ -82,106 +96,194 @@ package body Finrod.Net.Eth is
    --  			       Target => System.Address);
    
    
+   type Stashed_Type;
+   type Stashed_P_Type is access all Stashed_Type;
+   type Stashed_Type is record
+      Frame_Addr : Frame_Address_Type;
+      Frame_Len  : Frame_Length_Type;
+      Next       : Stashed_P_Type;
+   end record;
+   
+   Stash_Root    : Stashed_P_Type := null;
+   Mt_Stash_Root : Stashed_P_Type := null;
+   
+   -- saved error regs for diagnosis:
+   
+   Error_Dmasr : Stm.Bits_32 := 0;
+   Error_Tdes0 : Stm.Bits_32 := 0;
+   
+   
    ----------------------
    --  local helpers   --
    --  mainly to build -- 
    --  the circus tent --
    ----------------------
    
+   -- inits a list of available eth frames
+   procedure Init_Frame_Store
+   is
+   begin
+      for I in Buf_Idx_Type'Range loop
+	 declare
+	    Fs : Frame_Store_P_Type := new Frame_Store_Type;
+	 begin
+	    Fs.Buf_Idx  := Buf_Idx_Type (I);
+	    Fs.Faddr    := Buf (I)'Address;
+	    Fs.Free     := True;
+	    Fs.Next     := Frame_Store;
+	    Frame_Store := Fs;
+	 end;
+      end loop;
+   end Init_Frame_Store;
+   
+   -- mark a eth buffer used
+   procedure Mark_Used (Idx : Buf_Idx_Type)
+   is
+      Fs : Frame_Store_P_Type := Frame_Store;
+   begin
+      while Fs /= null loop
+	 if Fs.Buf_Idx = Idx then
+	    Fs.Free   := False;
+	    exit;
+	 end if
+      end loop;
+   end Mark_Used; -------------------------------no buffer error
+   
+   
+   procedure Mark_Used (Fa : Frame_Address_Type)
+   is
+      Fs : Frame_Store_P_Type := Frame_Store;
+   begin
+      while Fs /= null loop
+	 if Fs.Faddr = Fa then
+	    Fs.Free   := False;
+	    exit;
+	 end if
+      end loop;
+   end Mark_Used;
+   
+   
+   -- return an eth buffer to the free list
+   procedure Mark_free (Idx : Buf_Idx_Type)
+   is
+      Fs : Frame_Store_P_Type := Frame_Store;
+   begin
+      while Fs /= null loop
+	 if Fs.Buf_Idx = Idx then
+	    Fs.Free   := True;
+	    exit;
+	 end if
+      end loop;
+   end Mark_Free;
+   
+   
+   procedure Mark_Free (Fa : Frame_Address_Type)
+   is
+      Fs : Frame_Store_P_Type := Frame_Store;
+   begin
+      while Fs /= null loop
+	 if Fs.Faddr = Fa then
+	    Fs.Free   := True;
+	    exit;
+	 end if
+      end loop;
+   end Mark_Free;
+   
+   
    procedure Init_buffers
    is
    begin
       --- initialize the rx descriptors, as far as known
-      Rx_Desc_1.Rdes0.Own   := Ebuf.Me;
+      Rx_Desc (0).Rdes0.Own   := Ebuf.Me;
       
-      Rx_Desc_1.Rdes1.Dic   := Ebuf.Disable; -- interrupt on rec off for the time.
-      Rx_Desc_1.Rdes1.Rbs2  := 0; -- second buffer size
-      Rx_Desc_1.Rdes1.Rer   := Ebuf.Off;
-      Rx_Desc_1.Rdes1.Rch   := Ebuf.Tru;
-      Rx_Desc_1.Rdes1.Rbs1  := 1024;
+      Rx_Desc (0).Rdes1.Dic   := Ebuf.Disable; -- interrupt on rec off for the time.
+      Rx_Desc (0).Rdes1.Rbs2  := 0; -- second buffer size
+      Rx_Desc (0).Rdes1.Rer   := Ebuf.Off;
+      Rx_Desc (0).Rdes1.Rch   := Ebuf.Tru;
+      Rx_Desc (0).Rdes1.Rbs1  := 1024;
       
-      Rx_Desc_1.Rdes2.Rbap1 := Tob (Buf1'address);
-      
-      Rx_Desc_1.Rdes3.Rbap2 := Tob (Rx_Desc_2'Address);
+      Rx_Desc (0).Rdes2.Rbap1 := Tob (Buf (0)'address);
+      Mark_Used (0);
+      Rx_Desc (0).Rdes3.Rbap2 := Tob (Rx_Desc (1)'Address);
       ---
-      Rx_Desc_2.Rdes0.Own   := Ebuf.Me;
+      Rx_Desc (1).Rdes0.Own   := Ebuf.Me;
       
-      Rx_Desc_2.Rdes1.Dic   := Ebuf.Disable; -- interrupt on rec off for the time.
-      Rx_Desc_2.Rdes1.Rbs2  := 0; -- second buffer size
-      Rx_Desc_2.Rdes1.Rer   := Ebuf.Off;
-      Rx_Desc_2.Rdes1.Rch   := Ebuf.Tru;
-      Rx_Desc_2.Rdes1.Rbs1  := 1024;
+      Rx_Desc (1).Rdes1.Dic   := Ebuf.Disable; -- interrupt on rec off for the time.
+      Rx_Desc (1).Rdes1.Rbs2  := 0; -- second buffer size
+      Rx_Desc (1).Rdes1.Rer   := Ebuf.Off;
+      Rx_Desc (1).Rdes1.Rch   := Ebuf.Tru;
+      Rx_Desc (1).Rdes1.Rbs1  := 1024;
       
-      Rx_Desc_2.Rdes2.Rbap1 := Tob (Buf2'address);
-      
-      Rx_Desc_2.Rdes3.Rbap2 := Tob (Rx_Desc_3'Address);
+      Rx_Desc (1).Rdes2.Rbap1 := Tob (Buf (1)'address);
+      Mark_Used (1);
+      Rx_Desc (1).Rdes3.Rbap2 := Tob (Rx_Desc (2)'Address);
       ---
-      Rx_Desc_3.Rdes0.Own   := Ebuf.Me;
+      Rx_Desc (2).Rdes0.Own   := Ebuf.Me;
       
-      Rx_Desc_3.Rdes1.Dic   := Ebuf.Disable; -- interrupt on rec off for the time.
-      Rx_Desc_3.Rdes1.Rbs2  := 0; -- second buffer size
-      Rx_Desc_3.Rdes1.Rer   := Ebuf.Tru;
-      Rx_Desc_3.Rdes1.Rch   := Ebuf.Tru;
-      Rx_Desc_3.Rdes1.Rbs1  := 1024;
+      Rx_Desc (2).Rdes1.Dic   := Ebuf.Disable; -- interrupt on rec off for the time.
+      Rx_Desc (2).Rdes1.Rbs2  := 0; -- second buffer size
+      Rx_Desc (2).Rdes1.Rer   := Ebuf.Tru;
+      Rx_Desc (2).Rdes1.Rch   := Ebuf.Tru;
+      Rx_Desc (2).Rdes1.Rbs1  := 1024;
       
-      Rx_Desc_3.Rdes2.Rbap1 := Tob (Buf3'address);
-      
-      Rx_Desc_3.Rdes3.Rbap2 := Tob (Rx_Desc_1'Address);
+      Rx_Desc (2).Rdes2.Rbap1 := Tob (Buf (2)'address);
+      Mark_Used (2);
+      Rx_Desc (2).Rdes3.Rbap2 := Tob (Rx_Desc (0)'Address);
       ---
       --- initialize the tx descriptors, as far as known
-      Tx_Desc_1.Tdes0.Own   := Ebuf.Me;
-      Tx_Desc_1.Tdes0.Ic    := Ebuf.Off; -- no int on completion
-      Tx_Desc_1.Tdes0.Ls    := Ebuf.Tru; --!!!!!!!!!!!!!!!!!!!!!!!!!!
-      Tx_Desc_1.Tdes0.Fs    := Ebuf.Tru; --!!!!!!!!!!!!!!!!!!!!!!!!!!
-      Tx_Desc_1.Tdes0.Dc    := Ebuf.Off;
-      Tx_Desc_1.Tdes0.Dp    := Ebuf.Off;
-      Tx_Desc_1.Tdes0.Ttse  := Ebuf.Enable; -- timestamp enable
-      Tx_Desc_1.Tdes0.Cic   := Ebuf.Ck_Head_Payload; -- checksum
-      Tx_Desc_1.Tdes0.Ter   := Ebuf.Off;
-      Tx_Desc_1.Tdes0.Thc   := Ebuf.Tru;
+      Tx_Desc (0).Tdes0.Own   := Ebuf.Me;
+      Tx_Desc (0).Tdes0.Ic    := Ebuf.Off; -- no int on completion
+      Tx_Desc (0).Tdes0.Ls    := Ebuf.Tru; --!!!!!!!!!!!!!!!!!!!!!!!!!!
+      Tx_Desc (0).Tdes0.Fs    := Ebuf.Tru; --!!!!!!!!!!!!!!!!!!!!!!!!!!
+      Tx_Desc (0).Tdes0.Dc    := Ebuf.Off;
+      Tx_Desc (0).Tdes0.Dp    := Ebuf.Off;
+      Tx_Desc (0).Tdes0.Ttse  := Ebuf.Enable; -- timestamp enable
+      Tx_Desc (0).Tdes0.Cic   := Ebuf.Ck_Head_Payload; -- checksum
+      Tx_Desc (0).Tdes0.Ter   := Ebuf.Off;
+      Tx_Desc (0).Tdes0.Thc   := Ebuf.Tru;
       
-      Tx_Desc_1.Tdes1.Tbs2  := 0; -- second buffer size
-      Tx_Desc_1.Tdes1.Tbs1  := 0; --1024; -- to be set by appl
+      Tx_Desc (0).Tdes1.Tbs2  := 0; -- second buffer size
+      Tx_Desc (0).Tdes1.Tbs1  := 0; --1024; -- to be set by appl
       
-      Tx_Desc_1.Tdes2.Tbap1 := Tob (Buf4'Address); -- for the time being!!!!!
+      Tx_Desc (0).Tdes2.Tbap1 := null; -- for the time being!!!!!
       
-      Tx_Desc_1.Tdes3.Tbap2 := Tob (Tx_Desc_2'Address);
+      Tx_Desc (0).Tdes3.Tbap2 := Tob (Tx_Desc (1)'Address);
       ---
-      Tx_Desc_2.Tdes0.Own   := Ebuf.Me;
-      Tx_Desc_2.Tdes0.Ic    := Ebuf.Off; -- no int on completion
-      Tx_Desc_2.Tdes0.Ls    := Ebuf.Tru; --!!!!!!!!!!!!!!!!!!!!!!!!!!
-      Tx_Desc_2.Tdes0.Fs    := Ebuf.Tru; --!!!!!!!!!!!!!!!!!!!!!!!!!!
-      Tx_Desc_2.Tdes0.Dc    := Ebuf.Off;
-      Tx_Desc_2.Tdes0.Dp    := Ebuf.Off;
-      Tx_Desc_2.Tdes0.Ttse  := Ebuf.Enable; -- timestamp enable
-      Tx_Desc_2.Tdes0.Cic   := Ebuf.Ck_Head_Payload; -- checksum
-      Tx_Desc_2.Tdes0.Ter   := Ebuf.Off;
-      Tx_Desc_2.Tdes0.Thc   := Ebuf.Tru;
+      Tx_Desc (1).Tdes0.Own   := Ebuf.Me;
+      Tx_Desc (1).Tdes0.Ic    := Ebuf.Off; -- no int on completion
+      Tx_Desc (1).Tdes0.Ls    := Ebuf.Tru; --!!!!!!!!!!!!!!!!!!!!!!!!!!
+      Tx_Desc (1).Tdes0.Fs    := Ebuf.Tru; --!!!!!!!!!!!!!!!!!!!!!!!!!!
+      Tx_Desc (1).Tdes0.Dc    := Ebuf.Off;
+      Tx_Desc (1).Tdes0.Dp    := Ebuf.Off;
+      Tx_Desc (1).Tdes0.Ttse  := Ebuf.Enable; -- timestamp enable
+      Tx_Desc (1).Tdes0.Cic   := Ebuf.Ck_Head_Payload; -- checksum
+      Tx_Desc (1).Tdes0.Ter   := Ebuf.Off;
+      Tx_Desc (1).Tdes0.Thc   := Ebuf.Tru;
       
-      Tx_Desc_2.Tdes1.Tbs2  := 0; -- second buffer size
-      Tx_Desc_2.Tdes1.Tbs1  := 0; --1024; -- to be set by appl
+      Tx_Desc (1).Tdes1.Tbs2  := 0; -- second buffer size
+      Tx_Desc (1).Tdes1.Tbs1  := 0; --1024; -- to be set by appl
       
-      Tx_Desc_2.Tdes2.Tbap1 := Tob (Buf4'Address); -- for the time being!!!!!
+      Tx_Desc (1).Tdes2.Tbap1 := Tob (Buf4'Address); -- for the time being!!!!!
       
-      Tx_Desc_2.Tdes3.Tbap2 := Tob (Tx_Desc_3'Address);
+      Tx_Desc (1).Tdes3.Tbap2 := Tob (Tx_Desc (2)'Address);
       ---
-      Tx_Desc_3.Tdes0.Own   := Ebuf.Me;
-      Tx_Desc_3.Tdes0.Ic    := Ebuf.Off; -- no int on completion
-      Tx_Desc_3.Tdes0.Ls    := Ebuf.Tru; --!!!!!!!!!!!!!!!!!!!!!!!!!!
-      Tx_Desc_3.Tdes0.Fs    := Ebuf.Tru; --!!!!!!!!!!!!!!!!!!!!!!!!!!
-      Tx_Desc_3.Tdes0.Dc    := Ebuf.Off;
-      Tx_Desc_3.Tdes0.Dp    := Ebuf.Off;
-      Tx_Desc_3.Tdes0.Ttse  := Ebuf.Enable; -- timestamp enable
-      Tx_Desc_3.Tdes0.Cic   := Ebuf.Ck_Head_Payload; -- checksum
-      Tx_Desc_3.Tdes0.Ter   := Ebuf.Tru;
-      Tx_Desc_3.Tdes0.Thc   := Ebuf.Tru;
+      Tx_Desc (2).Tdes0.Own   := Ebuf.Me;
+      Tx_Desc (2).Tdes0.Ic    := Ebuf.Off; -- no int on completion
+      Tx_Desc (2).Tdes0.Ls    := Ebuf.Tru; --!!!!!!!!!!!!!!!!!!!!!!!!!!
+      Tx_Desc (2).Tdes0.Fs    := Ebuf.Tru; --!!!!!!!!!!!!!!!!!!!!!!!!!!
+      Tx_Desc (2).Tdes0.Dc    := Ebuf.Off;
+      Tx_Desc (2).Tdes0.Dp    := Ebuf.Off;
+      Tx_Desc (2).Tdes0.Ttse  := Ebuf.Enable; -- timestamp enable
+      Tx_Desc (2).Tdes0.Cic   := Ebuf.Ck_Head_Payload; -- checksum
+      Tx_Desc (2).Tdes0.Ter   := Ebuf.Tru;
+      Tx_Desc (2).Tdes0.Thc   := Ebuf.Tru;
       
-      Tx_Desc_3.Tdes1.Tbs2  := 0; -- second buffer size
-      Tx_Desc_3.Tdes1.Tbs1  := 0; --1024; -- to be set by appl
+      Tx_Desc (2).Tdes1.Tbs2  := 0; -- second buffer size
+      Tx_Desc (2).Tdes1.Tbs1  := 0; --1024; -- to be set by appl
       
-      Tx_Desc_3.Tdes2.Tbap1 := Tob (Buf4'Address); -- for the time being!!!!!
+      Tx_Desc (2).Tdes2.Tbap1 := Tob (Buf4'Address); -- for the time being!!!!!
       
-      Tx_Desc_3.Tdes3.Tbap2 := Tob (Tx_Desc_1'Address);
+      Tx_Desc (2).Tdes3.Tbap2 := Tob (Tx_Desc (0)'Address);
    end Init_Buffers;
    
    
@@ -199,13 +301,36 @@ package body Finrod.Net.Eth is
    end Dma_Reset;
    
    
+   -- sets the dna bus mode and enables interrupts if needed
+   -- sets first descriptor addresses
+   procedure Set_Dma_Busmode
+   is
+      DMABMR_Tmp : Eth.DMABMR_Register := R.Eth_Mac.DMABMR;
+   begin
+      DMABMR_Tmp.USP  := Eth.On;        -- Use separate PBL (could be at the moment)
+      DMABMR_Tmp.RDP  := Eth.RDP_2Beat; -- maximum number of beats (RxDMA)
+      DMABMR_Tmp.FB   := Eth.On;        -- Fixed Burst
+      DMABMR_Tmp.PBL  := Eth.PBL_2Beat; -- maximum number of beats (TxDMA)
+      DMABMR_Tmp.EDFE := Eth.Enabled;   -- Enhanced Descriptor Enable
+      -- I hope thats all. USP could be off id the buffers are vaguely equal size.
+      R.Eth_Mac.DMABMR := DMABMR_Tmp;
+      -- we are not going to use interrupts so
+      -- Ethernet DMA interrupt enable register will stay at 0's.
+      
+      -- first descriptor addresses 
+      R.Eth_Mac.DMARDLAR := Tob (Rx_Desc (Rx_Desc_Idx)'Address); 
+      R.Eth_Mac.DMATDLAR := Tob (Tx_Desc (Tx_Desc_Idx)'Address);
+   end Set_Dma_Busmode;
+   
+   
    -- next Set the 1st MAC address
    procedure Set_Addresses
    is
       use type Stm.Bits_48;
       use type Ifce.Unsigned_64;
       MACA0HR_Tmp : Eth.MACA0HR_Register := R.Eth_Mac.MACA0HR;
-      Address  : constant Ifce.Unsigned_64  := Ifce.Unsigned_64 (Board.Get_Mac_Address);
+      Address  : constant Ifce.Unsigned_64  := 
+	Ifce.Unsigned_64 (Board.Get_Mac_Address);
    begin
       R.Eth_Mac.MACA0LR  := Stm.Bits_32 (Address);
       MACA0HR_Tmp.MACA0H := Stm.Bits_16 (Ifce.Shift_Right (Address, 32));
@@ -218,7 +343,8 @@ package body Finrod.Net.Eth is
 	 --use type Stm.Bits_48;
 	 --use type Ifce.Unsigned_64;
 	 MACA1HR_Tmp : Eth.MACA1HR_Register := R.Eth_Mac.MACA1HR;
-	 Address  : constant Ifce.Unsigned_64  := Ifce.Unsigned_64 (Board.Get_Bcast_Address);
+	 Address  : constant Ifce.Unsigned_64  := 
+	   Ifce.Unsigned_64 (Board.Get_Bcast_Address);
       begin
 	 R.Eth_Mac.MACA1LR  := Stm.Bits_32 (Address);
 	 MACA1HR_Tmp.MACA1H := Stm.Bits_16 (Ifce.Shift_Right (Address, 32));
@@ -305,19 +431,59 @@ package body Finrod.Net.Eth is
    -- check for completed or error.
    -- in case of error, normally there is a re-transmission 
    -- after the error has been cleared.
-   function Poll_Xmit_Completed return Poll_X_Reply_Type
+   function Poll_Xmit_Completed (Dix  : in  Tx_Desc_Idx_Type;
+				 Time : out Timer.Time_type) 
+				return Poll_X_Reply_Type
    is
+      use type Stm.Bits_1;
+      function Des0Tob is new
+	Ada.Unchecked_Conversion (Source => Ebuf.Tdes0_Type,
+				  Target => Stm.Bits_32);
+      function DmasrTob is new
+	Ada.Unchecked_Conversion (Source => Eth.DMASR_Register,
+				  Target => Stm.Bits_32);
+      Tdes0_Tmp : constant Ebuf.Tdes0_Type    := Tx_Desc (Dix).Tdes0;
+      Dmasr_Tmp : constant Eth.DMASR_Register := R.Eth_Mac.DMASR;
    begin
-      return Ongoing;
+      if Dmasr_Tmp.Ais = Eth.Tripped or Tdes0_Tmp.Es = Ebuf.Tripped then
+	 Error_Dmasr  := DmasrTob (Dmasr_Tmp); -- for later analisys
+	 Error_Tdes0  := des0tob (Tdes0_Tmp);
+	 return Error_Fatal; -- until we know better
+      end if;
+      
+      if Tdes0_Tmp.Own = Ebuf.Dma then
+	 return Ongoing;
+	 
+      else
+	 declare
+	    subtype Tdec3_Time_Type is Ebuf.Tdes3_Type (True);
+	    subtype Tdec2_Time_Type is Ebuf.Tdes2_Type (True);
+	 begin
+	    Time.Seconds := Tdec3_Time_Type (Tx_Desc (Dix).Tdes3).Ttsh;
+	    Time.Subsecs := Tdec2_Time_Type (Tx_Desc (Dix).Tdes2).Ttsl;
+	 end;
+	 -- return the buffer
+	 return Complete;
+      end if;
    end Poll_Xmit_Completed;
    
    
    -- queues a frame for sending,
    -- it is meant as a stage2 repost action, which can be executed just now
-   procedure Stash_For_Sending (Ba : Frame_Address; Bbc : Frame_Length_Type)
+   procedure Stash_For_Sending (Ba : Frame_Address_Type; Bbc : Frame_Length_Type)
    is
+      Stash : Stashed_P_Type;
    begin
-      null;
+      if Mt_Stash_Root /= null then
+	 Stash := Mt_Stash_Root;
+	 Mt_Stash_Root := Mt_Stash_Root.Next;
+      else
+	 Stash := new Stashed_Type;
+      end if;
+      Stash.Frame_Addr := Ba;
+      Stash.Frame_Len  := Bbc;
+      Stash.Next       := Stash_Root;
+      Stash_Root       := Stash;
    end Stash_For_Sending;
    
    
@@ -325,22 +491,85 @@ package body Finrod.Net.Eth is
    -- no more than 1 item on the stack.
    -- so this command should happen after Stash_For_Sending without any
    -- ethernet send activity in between.
+   -- the function returns false when 
+   -- the next descriptor in the array is still in use. 
+   -- If this were to happen the eth net quality is most likely very poor, since
+   -- there are buffers waiting to be transmitted.
    -- use Poll_Xmit_Completed after this command to ascertain its gone.
-   procedure Send_Next
+   function Send_Next (Dix : out Tx_Desc_Idx_Type)
+		      return boolean
    is
+      use type Stm.Bits_1;
+      Stash : constant Stashed_P_Type    := Stash_Root;
    begin
-      null;
+      if Tx_Desc (Tx_Desc_Idx).Tdes0.Own = Ebuf.Me then
+	 Tx_Desc (Tx_Desc_Idx).Tdes1.Tbs1   := Stash.Frame_Len;
+	 Tx_Desc (Tx_Desc_Idx).Tdes2.Tbap1  := Tob (Stash.Frame_Addr);
+	 Tx_Desc (Tx_Desc_Idx).Tdes0.Own    := Ebuf.Dma; -- control to DMA
+	 
+	 -- and start transmission
+	 R.Eth_Mac.DMATDLAR := Tob (Tx_Desc (Tx_Desc_Idx)'Address);
+	 declare 
+	    Dmaomr_Tmp : Eth.DMAOMR_Register := R.Eth_Mac.Dmaomr;
+	 begin
+	    Dmaomr_Tmp.ST    := Eth.Start;
+	    R.Eth_Mac.Dmaomr := Dmaomr_Tmp;
+	 end;
+	 
+	 Stash_Root.Next := Stash.Next;         -- out of the chain and
+	 Stash.Next      := Mt_Stash_Root.Next; -- into the empty chain
+	 Mt_Stash_Root   := Stash;
+	 
+	 Dix             := Tx_Desc_Idx;        -- for return to app
+	 Tx_Desc_Idx     := Tx_Desc_Idx + 1;    -- assume it is empty
+	 return True;
+      else
+	 return False; -- here is an error, ethernet sits too long on buffers
+      end if;
    end Send_Next;
    
     
    -- to send a frame build it first then pass the address and the length
    -- here for transmission.
    -- the frame can ony be released once it has been successfully sent.
-   -- lets see if this works as a queueing mechanism.
-   procedure Send_Frame (Ba : Frame_Address; Bbc : Frame_Length_Type)
+   -- 
+   -- the function returns false when 
+   -- the next descriptor in the array is still in use. 
+   -- If this were to happen the eth net quality is most likely very poor, since
+   -- there are buffers waiting to be transmitted.
+   -- use Poll_Xmit_Completed after this command to ascertain its gone.
+   function Send_Frame (Ba  : in Frame_Address_Type; 
+			Bbc : in Frame_Length_Type;
+			Dix : out Tx_Desc_Idx_Type) return boolean
    is
+      use type Stm.Bits_1;
+      Tdes0_Tmp : Ebuf.Tdes0_Type := Tx_Desc (Tx_Desc_Idx).Tdes0;
    begin
-      null;
+      if Tdes0_Tmp.Own = Ebuf.Me then
+	 Tdes0_Tmp.Ls                       := Ebuf.Tru; --!!!!!!!
+	 Tdes0_Tmp.Fs                       := Ebuf.Tru; --!!!!!!!
+	 Tdes0_Tmp.Ttse                     := Ebuf.Enable; -- timestamp enable
+	 Tdes0_Tmp.Cic                      := Ebuf.Ck_Head_Payload; -- checksum
+	 Tx_Desc (Tx_Desc_Idx).Tdes0        := Tdes0_Tmp;
+	 Tx_Desc (Tx_Desc_Idx).Tdes1.Tbs1   := Bbc;
+	 Tx_Desc (Tx_Desc_Idx).Tdes2.Tbap1  := Tob (Ba);
+	 Tdes0_Tmp.Own                      := Ebuf.Dma; -- control to DMA
+	 Tx_Desc (Tx_Desc_Idx).Tdes0        := Tdes0_Tmp;
+	 
+	 -- and start transmission
+	 R.Eth_Mac.DMATDLAR := Tob (Tx_Desc (Tx_Desc_Idx)'Address);
+	 declare 
+	    Dmaomr_Tmp : Eth.DMAOMR_Register := R.Eth_Mac.Dmaomr;
+	 begin
+	    Dmaomr_Tmp.ST    := Eth.Start;
+	    R.Eth_Mac.Dmaomr := Dmaomr_Tmp;
+	 end;
+	 Dix             := Tx_Desc_Idx;        -- for return to app
+	 Tx_Desc_Idx     := Tx_Desc_Idx + 1;    -- assume it is empty
+	 return True;
+      else
+	 return False; -- here is an error, ethernet sits too long on buffers
+      end if;
    end Send_Frame;
    
    
@@ -364,6 +593,7 @@ package body Finrod.Net.Eth is
 	    Dma_Reset;
 	    Fsm_State := Eth_Set_Addresses;
 	 when Eth_Set_Addresses     =>
+	    Set_Dma_Busmode;
 	    Set_Addresses;
 	    Fsm_State := Eth_Init_Frame_Filter;
 	 when Eth_Init_Frame_Filter =>
@@ -394,10 +624,11 @@ package body Finrod.Net.Eth is
    
    
    -- starts the ETH initialization procedure from a soft reset.
-   -- it will put the PHY's init fsm on the job stack for executing 1 pass
-   -- every scan period.
+   -- the PHY's init fsm must have been on the job stack already, since
+   -- it takes about half a sec to complete.
    -- once finished the fsm will disappear from the jobstack and 
-   -- the state selector will be at ready.
+   -- the state selector will be at Eth_Ready_To_Start; awaiting
+   -- Eth_Start.
    procedure Reset
    is
    begin
@@ -406,16 +637,15 @@ package body Finrod.Net.Eth is
    end Reset;
    
    
-   -- starts all ethernet facilities.
+   -- starts all ethernet facilities, after eth and Phy are initialized and ready
    -- if not in State 'Eth_Ready_To_Start' the function will return false.
    -- else true.
-   function Eth_Start return Boolean 
+   -- 
+   procedure Eth_Start
    is
    begin
       if Fsm_State = Eth_Ready_To_Start then
 	 Thr.Insert_Job (Fsm'Access);
-	 return True;
-      else return False;
       end if;
    end Eth_Start;
    

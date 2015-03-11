@@ -169,7 +169,7 @@ package body Finrod.Net.Arp is
    -- test a received frame, defined by the frame address and the length, 
    -- for ownership.
    function Test_Frame 
-     (Ba : Frame_Address; Bbc : Frame_Length_Type)
+     (Ba : Frame_Address_Type; Bbc : Frame_Length_Type)
      return Test_Reply_Type
    is
       use type Stm.Bits_48;
