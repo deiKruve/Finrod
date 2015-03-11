@@ -55,6 +55,13 @@ package Finrod.Net.Eth is
    -- public interface --
    ----------------------
    
+   procedure Start_Receive_DMA with Inline;
+   -- starts the receiver DMA
+   -- after all is setup and ready. this is the last step.
+   
+   function Tx_Status_Image return String;
+   -- returns the 2 status images of the last transmit
+   
    function Poll_Received return Poll_R_Reply_Type;
    -- poll for a received frame and determine the type.
    -- stash any split 2nd halves

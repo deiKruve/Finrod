@@ -29,6 +29,9 @@
 --
 -- this is the finrod ethernet mac interface
 -- 
+--
+
+pragma Warnings (Off, "*is not referenced");
 
 with System.Storage_Elements;
 with Ada.Unchecked_Conversion;
@@ -40,6 +43,7 @@ with STM32F4.o7xx.Registers;
 
 with Finrod.Board;
 with Finrod.Thread;
+with Finrod.Log;
 
 package body Finrod.Net.Eth is
    
@@ -50,7 +54,8 @@ package body Finrod.Net.Eth is
    package Eth  renames  STM32F4.o7xx.Eth;
    package R    renames  STM32F4.o7xx.Registers;
    package Thr  renames  Finrod.Thread;
-      
+   
+   
    ------------------------------
    -- some types and constants --
    ------------------------------
@@ -60,10 +65,6 @@ package body Finrod.Net.Eth is
    -- four, they are unisex, can be used for xmit and recv
    type Buf_Idx_Type is mod 4;
    Buf : array (Buf_Idx_Type) of Sto.Storage_Array (1 .. 1024);
-   --  Buf1 : Sto.Storage_Array (1 .. 1024);
-   --  Buf2 : Sto.Storage_Array (1 .. 1024);
-   --  Buf3 : Sto.Storage_Array (1 .. 1024);
-   --  Buf4 : Sto.Storage_Array (1 .. 1024);
    
    type Frame_Store_Type;
    type Frame_Store_P_Type is access all Frame_Store_Type;
@@ -87,14 +88,8 @@ package body Finrod.Net.Eth is
    Tx_Desc : array (Tx_Desc_Idx_Type) of Ebuf.Xl_Xmit_Desc_Type;
    for Tx_Desc'Alignment use 4;
    
-   -- conversions 
-   function Tob is new
-     Ada.Unchecked_Conversion (Source => System.Address,
-   			       Target => Stm.Bits_32);
-   --  function Toa is new
-   --    Ada.Unchecked_Conversion (Source => Stm.Bits_32,
-   --  			       Target => System.Address);
    
+   --  the stash  --
    
    type Stashed_Type;
    type Stashed_P_Type is access all Stashed_Type;
@@ -112,6 +107,10 @@ package body Finrod.Net.Eth is
    Error_Dmasr : Stm.Bits_32 := 0;
    Error_Tdes0 : Stm.Bits_32 := 0;
    
+   --  last received frame --
+   
+   
+   
    
    ----------------------
    --  local helpers   --
@@ -119,15 +118,25 @@ package body Finrod.Net.Eth is
    --  the circus tent --
    ----------------------
    
+   -- conversions --
+   
+   function Tob is new
+     Ada.Unchecked_Conversion (Source => System.Address,
+   			       Target => Stm.Bits_32);
+   function Toa is new
+     Ada.Unchecked_Conversion (Source => Stm.Bits_32,
+   			       Target => System.Address);
+   
+   
    -- inits a list of available eth frames
    procedure Init_Frame_Store
    is
    begin
       for I in Buf_Idx_Type'Range loop
 	 declare
-	    Fs : Frame_Store_P_Type := new Frame_Store_Type;
+	    Fs : constant Frame_Store_P_Type := new Frame_Store_Type;
 	 begin
-	    Fs.Buf_Idx  := Buf_Idx_Type (I);
+	    Fs.Buf_Idx  := I;
 	    Fs.Faddr    := Buf (I)'Address;
 	    Fs.Free     := True;
 	    Fs.Next     := Frame_Store;
@@ -136,65 +145,126 @@ package body Finrod.Net.Eth is
       end loop;
    end Init_Frame_Store;
    
+   
    -- mark a eth buffer used
    procedure Mark_Used (Idx : Buf_Idx_Type)
    is
       Fs : Frame_Store_P_Type := Frame_Store;
    begin
-      while Fs /= null loop
-	 if Fs.Buf_Idx = Idx then
-	    Fs.Free   := False;
-	    exit;
-	 end if
+      while Fs /= null and then Fs.Buf_Idx /= Idx loop
+	 Fs := Fs.Next;
       end loop;
-   end Mark_Used; -------------------------------no buffer error
+      
+      if Fs /= null then 
+	 Fs.Free := False;
+	 
+      else
+	 Log.Log_Error (Log.Eth_Error_Buffers, "buffer not found.");
+      end if;
+   end Mark_Used;
    
    
    procedure Mark_Used (Fa : Frame_Address_Type)
    is
+      use type System.Address;
       Fs : Frame_Store_P_Type := Frame_Store;
    begin
-      while Fs /= null loop
-	 if Fs.Faddr = Fa then
-	    Fs.Free   := False;
-	    exit;
-	 end if
+      while Fs /= null and then Fs.Faddr /= Fa loop
+	 Fs := Fs.Next;
       end loop;
+      
+      if Fs /= null then 
+	 Fs.Free := False;
+	 
+      else
+	 Log.Log_Error (Log.Eth_Error_Buffers, "buffer not found.");
+      end if;
    end Mark_Used;
    
    
    -- return an eth buffer to the free list
    procedure Mark_free (Idx : Buf_Idx_Type)
    is
+      use type System.Address;
       Fs : Frame_Store_P_Type := Frame_Store;
    begin
-      while Fs /= null loop
-	 if Fs.Buf_Idx = Idx then
-	    Fs.Free   := True;
-	    exit;
-	 end if
+      while Fs /= null and then Fs.Buf_Idx /= Idx loop
+	 Fs := Fs.Next;
       end loop;
+      
+      if Fs /= null then 
+	 Fs.Free := True;
+	 
+      else
+	 Log.Log_Error (Log.Eth_Error_Buffers, "buffer not found.");
+      end if;
    end Mark_Free;
    
    
    procedure Mark_Free (Fa : Frame_Address_Type)
    is
+      use type System.Address;
       Fs : Frame_Store_P_Type := Frame_Store;
    begin
-      while Fs /= null loop
-	 if Fs.Faddr = Fa then
-	    Fs.Free   := True;
-	    exit;
-	 end if
+      while Fs /= null and then Fs.Faddr /= Fa loop
+	 Fs := Fs.Next;
       end loop;
+      
+      if Fs /= null then 
+	 Fs.Free := True;
+	 
+      else 
+	 Log.Log_Error (Log.Eth_Error_Buffers, "buffer not found.");
+      end if;
    end Mark_Free;
+   
+   
+   --  find a free buffer  --
+   function Find_Free ( Fa : out Frame_Address_Type) 
+		      return Boolean
+   is
+      Fs : Frame_Store_P_Type := Frame_Store;
+   begin
+      while Fs /= null and then Fs.Free /= True loop
+	 Fs := Fs.Next;
+      end loop;
+      
+      if Fs /= null then
+	 Fa := Fs.all'Address;
+	 return True;
+	 
+      else
+	 Log.Log_Error (Log.Eth_Error_No_Buffers, "no eth buffers");
+	 return False;
+      end if;
+   end Find_Free;
+   
+   
+   function Find_Free (Idx : out Buf_Idx_Type) 
+		      return Boolean 
+   is
+      Fs : Frame_Store_P_Type := Frame_Store;
+   begin
+      while Fs /= null and then Fs.Free /= True loop
+	 Fs := Fs.Next;
+      end loop;
+      
+      if Fs /= null then
+	 Idx := Fs.Buf_Idx;
+	 return True;
+	 
+      else
+	 Log.Log_Error (Log.Eth_Error_No_Buffers, "no eth buffers");
+	 return False;
+      end if;
+   end Find_Free;
    
    
    procedure Init_buffers
    is
    begin
       --- initialize the rx descriptors, as far as known
-      Rx_Desc (0).Rdes0.Own   := Ebuf.Me;
+      Rx_Desc (0).Rdes0.Own   := Ebuf.DMA;
       
       Rx_Desc (0).Rdes1.Dic   := Ebuf.Disable; -- interrupt on rec off for the time.
       Rx_Desc (0).Rdes1.Rbs2  := 0; -- second buffer size
@@ -206,7 +276,7 @@ package body Finrod.Net.Eth is
       Mark_Used (0);
       Rx_Desc (0).Rdes3.Rbap2 := Tob (Rx_Desc (1)'Address);
       ---
-      Rx_Desc (1).Rdes0.Own   := Ebuf.Me;
+      Rx_Desc (1).Rdes0.Own   := Ebuf.DMA;
       
       Rx_Desc (1).Rdes1.Dic   := Ebuf.Disable; -- interrupt on rec off for the time.
       Rx_Desc (1).Rdes1.Rbs2  := 0; -- second buffer size
@@ -218,7 +288,7 @@ package body Finrod.Net.Eth is
       Mark_Used (1);
       Rx_Desc (1).Rdes3.Rbap2 := Tob (Rx_Desc (2)'Address);
       ---
-      Rx_Desc (2).Rdes0.Own   := Ebuf.Me;
+      Rx_Desc (2).Rdes0.Own   := Ebuf.DMA;
       
       Rx_Desc (2).Rdes1.Dic   := Ebuf.Disable; -- interrupt on rec off for the time.
       Rx_Desc (2).Rdes1.Rbs2  := 0; -- second buffer size
@@ -245,7 +315,7 @@ package body Finrod.Net.Eth is
       Tx_Desc (0).Tdes1.Tbs2  := 0; -- second buffer size
       Tx_Desc (0).Tdes1.Tbs1  := 0; --1024; -- to be set by appl
       
-      Tx_Desc (0).Tdes2.Tbap1 := null; -- for the time being!!!!!
+      Tx_Desc (0).Tdes2.Tbap1 := 0; -- for the time being!!!!!
       
       Tx_Desc (0).Tdes3.Tbap2 := Tob (Tx_Desc (1)'Address);
       ---
@@ -263,7 +333,7 @@ package body Finrod.Net.Eth is
       Tx_Desc (1).Tdes1.Tbs2  := 0; -- second buffer size
       Tx_Desc (1).Tdes1.Tbs1  := 0; --1024; -- to be set by appl
       
-      Tx_Desc (1).Tdes2.Tbap1 := Tob (Buf4'Address); -- for the time being!!!!!
+      Tx_Desc (1).Tdes2.Tbap1 := 0; -- for the time being!!!!!
       
       Tx_Desc (1).Tdes3.Tbap2 := Tob (Tx_Desc (2)'Address);
       ---
@@ -281,7 +351,7 @@ package body Finrod.Net.Eth is
       Tx_Desc (2).Tdes1.Tbs2  := 0; -- second buffer size
       Tx_Desc (2).Tdes1.Tbs1  := 0; --1024; -- to be set by appl
       
-      Tx_Desc (2).Tdes2.Tbap1 := Tob (Buf4'Address); -- for the time being!!!!!
+      Tx_Desc (2).Tdes2.Tbap1 := 0; -- for the time being!!!!!
       
       Tx_Desc (2).Tdes3.Tbap2 := Tob (Tx_Desc (0)'Address);
    end Init_Buffers;
@@ -356,73 +426,95 @@ package body Finrod.Net.Eth is
    end Set_Addresses;
    
    
-      -- the mac frame filter 
+   -- the mac frame filter 
    procedure Init_Frame_Filter 
-     is
-	 MACFFR_Tmp : Eth.MACFFR_Register := R.Eth_Mac.MACFFR;
-      begin
-	 MACFFR_Tmp.RA    := Eth.Off;       -- Receive all
-	 MACFFR_Tmp.HPF   := Eth.Off;       -- for perfect, acc cube
-	 MACFFR_Tmp.SAF   := Eth.Off;       -- Source address filter enable
-	 MACFFR_Tmp.SAIF  := Eth.Off; 
-	 MACFFR_Tmp.PCF   := Eth.PCF_BlockAll;
-	 MACFFR_Tmp.BFD   := Eth.Pass_Allb; -- Broadcast frame disable
-	 MACFFR_Tmp.PAM   := Eth.Pass_Allm; -- Pass all mutlicast
-	 MACFFR_Tmp.DAIF  := Eth.Off; 
-	 MACFFR_Tmp.HM    := Eth.Off;       -- for perfect, acc cube
-	 MACFFR_Tmp.HU    := Eth.Normal;    -- for perfect, acc cube
-	 MACFFR_Tmp.PM    := Eth.Off;       -- Promiscuous mode off
-	 R.Eth_Mac.MACFFR := MACFFR_Tmp;
-      end Init_Frame_Filter;
-      
+   is
+      MACFFR_Tmp : Eth.MACFFR_Register := R.Eth_Mac.MACFFR;
+   begin
+      MACFFR_Tmp.RA    := Eth.Off;       -- Receive all
+      MACFFR_Tmp.HPF   := Eth.Off;       -- for perfect, acc cube
+      MACFFR_Tmp.SAF   := Eth.Off;       -- Source address filter enable
+      MACFFR_Tmp.SAIF  := Eth.Off; 
+      MACFFR_Tmp.PCF   := Eth.PCF_BlockAll;
+      MACFFR_Tmp.BFD   := Eth.Pass_Allb; -- Broadcast frame disable
+      MACFFR_Tmp.PAM   := Eth.Pass_Allm; -- Pass all mutlicast
+      MACFFR_Tmp.DAIF  := Eth.Off; 
+      MACFFR_Tmp.HM    := Eth.Off;       -- for perfect, acc cube
+      MACFFR_Tmp.HU    := Eth.Normal;    -- for perfect, acc cube
+      MACFFR_Tmp.PM    := Eth.Off;       -- Promiscuous mode off
+      R.Eth_Mac.MACFFR := MACFFR_Tmp;
+   end Init_Frame_Filter;
+   
 
-      -- mac control register
-      procedure Init_Maccr
-      is
-	 MACCR_Tmp : Eth.MACCR_Register := R.Eth_Mac.MACCR;
-      begin
-	 MACCR_Tmp.CSTF  := Eth.Strip_Crc;
-	 MACCR_Tmp.Wd    := Eth.WD_On; -- according to cube (2048 bytes max)
-	 MACCR_Tmp.JD    := Eth.Jt_On; -- according to cube (2048 bytes max)
-	 MACCR_Tmp.IFG   := Eth.IFG_96Bit;
-	 MACCR_Tmp.CSD   := Eth.Cs_On; -- cube but -- check for RMII --------
-	 MACCR_Tmp.FES   := Eth.Mb_100;
-	 MACCR_Tmp.ROD   := Eth.Off;   -- enabled, acc to cube
-	 MACCR_Tmp.LM    := Eth.Off;   -- loopback off
-	 MACCR_Tmp.DM    := Eth.Off;   -- duplex mode off
-	 MACCR_Tmp.IPCO  := Eth.Enabled; -- ip checksum offload on
-	 MACCR_Tmp.RD    := Eth.Retr_Disabled; -- gives an error after 1 collision
-	 -- this when working, and when starting up????----------------------
-	 MACCR_Tmp.APCS  := Eth.On;    -- Automatic Pad/CRC stripping
-	 MACCR_Tmp.Bl    := Eth.BL_10; -- back off time when collision.
-	 MACCR_Tmp.DC    := Eth.On;    -- deferral check max and give error.
-	 R.Eth_Mac.MACCR := MACCR_Tmp;
-	 
-	 -- and we are not done yet, everything is still off.
-      end Init_Maccr;
+   -- mac control register
+   procedure Init_Maccr
+   is
+      MACCR_Tmp : Eth.MACCR_Register := R.Eth_Mac.MACCR;
+   begin
+      MACCR_Tmp.CSTF  := Eth.Strip_Crc;
+      MACCR_Tmp.Wd    := Eth.WD_On; -- according to cube (2048 bytes max)
+      MACCR_Tmp.JD    := Eth.Jt_On; -- according to cube (2048 bytes max)
+      MACCR_Tmp.IFG   := Eth.IFG_96Bit;
+      MACCR_Tmp.CSD   := Eth.Cs_On; -- cube but -- check for RMII --------
+      MACCR_Tmp.FES   := Eth.Mb_100;
+      MACCR_Tmp.ROD   := Eth.Off;   -- enabled, acc to cube
+      MACCR_Tmp.LM    := Eth.Off;   -- loopback off
+      MACCR_Tmp.DM    := Eth.Off;   -- duplex mode off
+      MACCR_Tmp.IPCO  := Eth.Enabled; -- ip checksum offload on
+      MACCR_Tmp.RD    := Eth.Retr_Disabled; -- gives an error after 1 collision
+					    -- this when working, and when starting up????----------------------
+      MACCR_Tmp.APCS  := Eth.On;    -- Automatic Pad/CRC stripping
+      MACCR_Tmp.Bl    := Eth.BL_10; -- back off time when collision.
+      MACCR_Tmp.DC    := Eth.On;    -- deferral check max and give error.
+      R.Eth_Mac.MACCR := MACCR_Tmp;
       
-      
-      -- and here comes die ganze Zirkuskraft.
-      procedure Starting with inline
-      is
-	 MACCR_Tmp : Eth.MACCR_Register := R.Eth_Mac.MACCR;
-      begin
-	 MACCR_Tmp.Te    := Eth.On;
-	 MACCR_Tmp.Re    := Eth.On;
-	 R.Eth_Mac.MACCR := MACCR_Tmp;
-      end Starting;
+      -- and we are not done yet, everything is still off.
+   end Init_Maccr;
+   
+   
+   -- and here comes die ganze Zirkuskraft.
+   procedure Starting with inline
+   is
+      MACCR_Tmp : Eth.MACCR_Register := R.Eth_Mac.MACCR;
+   begin
+      MACCR_Tmp.Te    := Eth.On;
+      MACCR_Tmp.Re    := Eth.On;
+      R.Eth_Mac.MACCR := MACCR_Tmp;
+   end Starting;
    
    
    ----------------------
    -- public interface --
    ----------------------
    
- 
+   -- starts the receiver DMA
+   procedure Start_Receive_DMA
+   is
+      Dmaomr_Tmp : Eth.DMAOMR_Register := R.Eth_Mac.Dmaomr;
+   begin
+      Dmaomr_Tmp.SR    := Eth.Start;
+      R.Eth_Mac.Dmaomr := Dmaomr_Tmp;
+   end Start_Receive_DMA;
+   
+   
+   -- returns the 2 status images of the last transmit
+   function Tx_Status_Image return String
+   is (" DMAsr = " & Stm.Bits_32'Image (Error_Dmasr) & 
+	 " Tdes0 = " & Stm.Bits_32'Image (Error_Tdes0));
+   
+   
    -- poll for a received frame and determine the type.
    -- stash any split 2nd halves
    function Poll_Received return Poll_R_Reply_Type
    is
    begin
+      for I in Rx_Desc_Idx_Type'Range loop
+	 if Rx_Desc (I).Rdes0.Own   := Ebuf.Me then -- got a frame
+	    null;
+	    
+	    return Yes;
+	 end if;
+      end loop;
       return No;
    end Poll_Received;
    
@@ -446,8 +538,9 @@ package body Finrod.Net.Eth is
       Dmasr_Tmp : constant Eth.DMASR_Register := R.Eth_Mac.DMASR;
    begin
       if Dmasr_Tmp.Ais = Eth.Tripped or Tdes0_Tmp.Es = Ebuf.Tripped then
-	 Error_Dmasr  := DmasrTob (Dmasr_Tmp); -- for later analisys
+	 Error_Dmasr  := DmasrTob (Dmasr_Tmp); -- for later analysis
 	 Error_Tdes0  := des0tob (Tdes0_Tmp);
+	 Log.Log_Error (Log.Eth_Error_Xmit, Tx_Status_Image);
 	 return Error_Fatal; -- until we know better
       end if;
       
@@ -463,6 +556,7 @@ package body Finrod.Net.Eth is
 	    Time.Subsecs := Tdec2_Time_Type (Tx_Desc (Dix).Tdes2).Ttsl;
 	 end;
 	 -- return the buffer
+	 Mark_Free (Toa (Tx_Desc (Dix).Tdes3.Tbap2));
 	 return Complete;
       end if;
    end Poll_Xmit_Completed;
@@ -524,11 +618,12 @@ package body Finrod.Net.Eth is
 	 Tx_Desc_Idx     := Tx_Desc_Idx + 1;    -- assume it is empty
 	 return True;
       else
+	 Log.Log_Error (Log.Eth_Error_Xmit, "ethernet sits too long on buffers");
 	 return False; -- here is an error, ethernet sits too long on buffers
       end if;
    end Send_Next;
    
-    
+   
    -- to send a frame build it first then pass the address and the length
    -- here for transmission.
    -- the frame can ony be released once it has been successfully sent.
@@ -568,6 +663,7 @@ package body Finrod.Net.Eth is
 	 Tx_Desc_Idx     := Tx_Desc_Idx + 1;    -- assume it is empty
 	 return True;
       else
+	 Log.Log_Error (Log.Eth_Error_Xmit, "ethernet sits too long on buffers");
 	 return False; -- here is an error, ethernet sits too long on buffers
       end if;
    end Send_Frame;
@@ -587,6 +683,7 @@ package body Finrod.Net.Eth is
 	 when Eth_Idle              =>
 	    null;
 	 when Eth_Init_Buffers      =>
+	    Init_Frame_Store;
 	    Init_Buffers;
 	    Fsm_State := Eth_Dma_Reset;
 	 when Eth_Dma_Reset         =>

@@ -121,6 +121,7 @@ package body Finrod.Nmt is
 	    when Nmt_Wait_Communication_Ok      =>
 	       if Eth.State = Eth.Eth_Ready then
 		  Log.Log ("communication ok now.");
+		  Eth.Start_Receive_DMA; -- so the receiver is now operational
 		  Fsm_State := Nmt_Reset_Configuration;
 	       end if;
 	       Thr.Scan;

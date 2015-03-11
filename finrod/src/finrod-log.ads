@@ -81,7 +81,10 @@ package Finrod.Log is
 		       Init_Error_Reset_Phy,
 		       Init_Error_Reset_App,
 		       Init_Error_Reset_Comms,
-		       Init_Error_Reset_Config);
+		       Init_Error_Reset_Config,
+		       Eth_Error_No_Buffers,
+		       Eth_Error_Buffers,
+		       Eth_Error_Xmit);
    -- the error type indicates the action to be taken.
    
    subtype Init_Error_Type is 
