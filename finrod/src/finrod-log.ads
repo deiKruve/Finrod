@@ -84,7 +84,9 @@ package Finrod.Log is
 		       Init_Error_Reset_Config,
 		       Eth_Error_No_Buffers,
 		       Eth_Error_Buffers,
-		       Eth_Error_Xmit);
+		       Eth_Error_Xmit,
+		       Eth_Error_Rcve,
+		       Net_Error);
    -- the error type indicates the action to be taken.
    
    subtype Init_Error_Type is 

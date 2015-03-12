@@ -30,9 +30,12 @@
 -- this is the top of the finrod ethernet interface
 --
 
---with Finrod.Net.Eth;
+with Finrod.Net.Eth;
+with Finrod.Net.Arp;
+with Finrod.Log;
 
 package body Finrod.Net is
+   
    --package Eth renames  Finrod.Net.Eth; ---- automagic in ada
    
    
@@ -42,17 +45,56 @@ package body Finrod.Net is
    
    -- poll for a received frame and determine the type.
    -- stash any split 2nd halves
-   function Poll_Received return Poll_R_Reply_Type
-   is (no);--(Eth.Poll_Received);
+   function Poll_Received return Test_Reply_Type
+   is 
+   begin
+      case Eth.Rx_Poll is
+	 when No          =>
+	    return None_recd;--------------return
+	 when Error_Fatal =>
+	    return Fatal_Error;------------return
+	 when Yes         =>
+	    case Arp.Test_Frame (Eth.Recvd_Frame_P, Eth.Recvd_Frame_L) is
+	       when No_Fit               =>
+		  null; -- do nothing  here, to the next test
+	       when Stashed_For_Sending  =>
+		  return Stashed_For_Sending;------------return
+	       when Stashed_For_ArpTable =>
+		  return Stashed_For_ArpTable;-----------return
+	       when others               =>
+		  Log.Log_Error (Log.Net_Error, "bad return fron test for arp");
+		  return Fatal_Error;------------return
+	    end case;
+	    -- other tests
+	    null;
+	 when others      =>
+	    return  None_recd; -- for the time being-------------
+      end case;
+      return  None_recd;
+   end Poll_Received;
    
    
    -- since we have a strictly sequential comms pattern we
    -- check for completed or error.
    -- in case of error, normally there is a re-transmission 
    -- after the error has been cleared.
-   function Poll_Xmit_Completed return Poll_X_Reply_Type
-   is (ongoing);--(Eth.Poll_Xmit_Completed);
-   
+   function Poll_Xmit_Completed (Dix : in  Tx_Desc_Idx_Type;
+				 Time : out Timer.Time_type)
+				return Poll_X_Reply_Type
+   is  
+   begin
+      case Eth.Poll_Xmit_Completed (Dix, Time) is-------------------------junk
+	 when Ongoing          =>
+	    return Ongoing;
+	 when Complete         =>
+	    return Complete;
+	 when Error_Fatal      =>
+	    return Error_Fatal;
+	 when Error_Retry      =>
+	    null;
+      end case;
+      return Error_Fatal;
+   end Poll_Xmit_Completed;
    
    -- execute the next stashed job, 
    -- used in time syncing and ReqRep.

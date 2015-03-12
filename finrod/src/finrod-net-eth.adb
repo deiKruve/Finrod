@@ -106,6 +106,7 @@ package body Finrod.Net.Eth is
    
    Error_Dmasr : Stm.Bits_32 := 0;
    Error_Tdes0 : Stm.Bits_32 := 0;
+   Error_Rdes0 : Stm.Bits_32 := 0;
    
    --  last received frame --
    
@@ -497,6 +498,16 @@ package body Finrod.Net.Eth is
    end Start_Receive_DMA;
    
    
+   -- returns the erronous dma status image caught at the last Receive poll
+   function Dma_Status_Image return String
+   is (" DMAsr = " & Stm.Bits_32'Image (Error_Dmasr));
+   
+   
+   -- returns the Rdescriptors status image of the last received frame.
+   function Rx_Status_Image return String 
+     is (" Rdes0 = " & Stm.Bits_32'Image (Error_Rdes0));
+   
+   
    -- returns the 2 status images of the last transmit
    function Tx_Status_Image return String
    is (" DMAsr = " & Stm.Bits_32'Image (Error_Dmasr) & 
@@ -505,18 +516,42 @@ package body Finrod.Net.Eth is
    
    -- poll for a received frame and determine the type.
    -- stash any split 2nd halves
-   function Poll_Received return Poll_R_Reply_Type
+   function Rx_Poll return Poll_R_Reply_Type
    is
+      use type Stm.Bits_1;
+      function Des0Tob is new
+	Ada.Unchecked_Conversion (Source => Ebuf.Rdes0_Type,
+				  Target => Stm.Bits_32);
+      function DmasrTob is new
+	Ada.Unchecked_Conversion (Source => Eth.DMASR_Register,
+				  Target => Stm.Bits_32);
+      Dmasr_Tmp : constant Eth.DMASR_Register := R.Eth_Mac.DMASR;
    begin
-      for I in Rx_Desc_Idx_Type'Range loop
-	 if Rx_Desc (I).Rdes0.Own   := Ebuf.Me then -- got a frame
-	    null;
-	    
-	    return Yes;
-	 end if;
-      end loop;
-      return No;
-   end Poll_Received;
+      if Dmasr_Tmp.Ais = Eth.Tripped then
+	 Error_Dmasr  := DmasrTob (Dmasr_Tmp); -- for later analysis
+	 Log.Log_Error (Log.Eth_Error_Rcve, DMA_Status_Image);
+	 return Error_Fatal; -- until we know better.
+      end if;
+      
+      if Dmasr_Tmp.Rs = Eth.F_Recd then
+	 for I in Rx_Desc_Idx_Type'Range loop
+	    if Rx_Desc (I).Rdes0.Own = Ebuf.Me then -- got a frame
+	       if Rx_Desc (I).Rdes0.Es = Ebuf.Tripped then -- but is it faulty?
+		  Error_Rdes0  := des0tob (Rx_Desc (I).Rdes0);
+		  Log.Log_Error (Log.Eth_Error_Rcve, Rx_Status_Image);
+		  return Error_Fatal; -- until we know better.
+	       else
+		  return Yes;
+	       end if;
+	    end if;
+	 end loop;
+	 Log.Log_Error (Log.Eth_Error_Rcve, "no own buffer found.");
+	 return Error_Fatal; -- until we know better.
+	 
+      else
+	 return No;
+      end if;
+   end Rx_Poll;
    
    
    -- since we have a strictly sequential comms pattern we

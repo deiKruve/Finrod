@@ -59,6 +59,9 @@ package Finrod.Net.Eth.PHY is
    -- once finished the fsm will disappear from the jobstack and 
    -- the state selector will be at ready.
    
+   function Phy_Interrupted return Boolean with Inline;
+   -- poll the phy interrupt on GPIOA pin 3
+   
    procedure Ask_Error;
    -- asks the PHY to reveal its status.
    -- After 'State' returns 'Phy_Ready' the error can be gotten with 

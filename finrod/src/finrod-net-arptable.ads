@@ -31,7 +31,7 @@
 --
 
 package Finrod.Net.Arptable is
-   
+      
    procedure Stash (Sha : Stm.Bits_48; 
 		    Spa : Stm.Bits_32);
    -- stash an address pair.

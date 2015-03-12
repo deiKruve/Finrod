@@ -61,6 +61,7 @@ package Finrod.Net.Arp is
      return Test_Reply_Type;
    -- test a received frame, defined by the frame address and the length, 
    -- for ownership.
+   -- returns one of : No_Fit, Stashed_For_Sending, Stashed_For_ArpTable
    
    ----------------------
    -- public interface --

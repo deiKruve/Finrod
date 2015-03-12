@@ -39,6 +39,8 @@
 
 with System;
 with STM32F4;
+--with Finrod.Net.Eth;
+with Finrod.Timer;
 
 package Finrod.Net is
    
@@ -65,11 +67,21 @@ package Finrod.Net is
    -- cause thats how the descriptor defines it
    
    
-   type Test_Reply_Type is (Fits,
+   type Rx_Desc_Idx_Type is mod 3;
+   type Tx_Desc_Idx_Type is mod 3;
+   -- the frame descriptor index types
+   -- when you need to know something about a descriptor,
+   -- pass a var of this type, with the desc nuber  (0 .. 2 at the moment)
+   -- 3 of each, until we need more
+   
+   
+   type Test_Reply_Type is (Fit,
 			    Stashed_For_Sending,  -- must be processed later
 			    Stashed_For_ArpTable, -- must be processed later
 			    Fits_With_Error,      -- there is a sender and an id!
-			    No_Fit);
+			    No_Fit,
+			    None_Recd,
+			    Fatal_error);
    -- reply type of the test_frame functions in the children.
    
    
@@ -90,12 +102,14 @@ package Finrod.Net is
    ----------------------
    -- public interface --
    ----------------------
-   
-   function Poll_Received return Poll_R_Reply_Type with Inline;
+   function Poll_Received return Test_Reply_Type with Inline;
    -- poll for a received frame and determine the type.
    -- stash any split 2nd halves
    
-   function Poll_Xmit_Completed return Poll_X_Reply_Type with Inline;
+   function Poll_Xmit_Completed (Dix : in  Tx_Desc_Idx_Type;
+				 Time : out Timer.Time_type)
+				return Poll_X_Reply_Type with Inline;
+   -- this still in a wide bag.--------------------------------
    -- since we have a strictly sequential comms pattern we
    -- check for completed or error.
    -- in case of error, normally there is a re-transmission 

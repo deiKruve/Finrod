@@ -48,23 +48,36 @@ package Finrod.Net.Eth is
    -- when you need to know something about a descriptor,
    -- pass a var of this type, with the desc nuber  (0 .. 2 at the moment)
    -- 3 of each, until we need more
-   type Rx_Desc_Idx_Type is mod 3;
-   type Tx_Desc_Idx_Type is mod 3;
+   --type Rx_Desc_Idx_Type is mod 3;
+   --type Tx_Desc_Idx_Type is mod 3;
+   -- moved up one level
    
    ----------------------
    -- public interface --
    ----------------------
    
+   Recvd_Frame_P : Frame_Address_Type; 
+   Recvd_Frame_L : Frame_Length_Type;
+   -- address and length of the last received good frame.
+   
    procedure Start_Receive_DMA with Inline;
    -- starts the receiver DMA
    -- after all is setup and ready. this is the last step.
    
-   function Tx_Status_Image return String;
+   function Dma_Status_Image return String with Inline;
+   -- returns the erronous dma status image caught at the last Receive poll
+   
+   function Rx_Status_Image return String with Inline;
+   -- returns the Rdescriptors status image of the last received frame.
+   
+   function Tx_Status_Image return String with Inline;
    -- returns the 2 status images of the last transmit
    
-   function Poll_Received return Poll_R_Reply_Type;
+   function Rx_Poll return Poll_R_Reply_Type;
    -- poll for a received frame and determine the type.
-   -- stash any split 2nd halves
+   -- if the answer is yes the received frame details are in
+   --  Recvd_Frame_P : Frame_Address_Type; 
+   --  Recvd_Frame_L : Frame_Length_Type;
    
    function Poll_Xmit_Completed (Dix : in  Tx_Desc_Idx_Type;
 				Time : out Timer.Time_type)
@@ -115,6 +128,12 @@ package Finrod.Net.Eth is
    -- there are buffers waiting to be transmitted.
    -- use Poll_Xmit_Completed after this command to ascertain its gone.
    
+   --procedure Mark_free (Idx : Buf_Idx_Type); -- wait a bit with this one
+   -- return an eth buffer to the free list
+   -- this must be done by any family that is thru with a frame.
+   
+   procedure Mark_Free (Fa : Frame_Address_Type);
+   -- return an eth buffer to the free list
 
    
    --------------------------

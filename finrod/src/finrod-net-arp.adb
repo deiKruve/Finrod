@@ -206,6 +206,7 @@ package body Finrod.Net.Arp is
 	 -- arp.anouncement.
 	 if Display_Rframes > 0 then Show (Ba); end if;
 	 Arp_Table.Stash (F.Sha, F.Spa);
+	 Eth.Mark_Free (Ba);
 	 return Stashed_For_ArpTable;
 	 
       elsif F.Oper = Arp_Req and F.Tpa = Board.Get_Ip_Address then
@@ -234,6 +235,7 @@ package body Finrod.Net.Arp is
 	 if Display_Rframes > 0 then Show (Ba); end if;
 	 Arp_Table.Stash (F.Sha, F.Spa);
 	 Arp_Table.Stash (F.Tha, F.Tpa);
+	 Eth.Mark_Free (Ba);
 	 return Stashed_For_ArpTable;
       end if;
       

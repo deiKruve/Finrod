@@ -30,6 +30,7 @@
 -- this is the finrod ethernet PHY interface
 -- 
 
+with STM32F4.Gpio;
 with STM32F4.o7xx.Eth;
 with STM32F4.o7xx.Registers;
 
@@ -40,6 +41,7 @@ with Finrod.Thread;
 package body Finrod.Net.Eth.PHY is
    
    package Stm  renames  STM32F4;
+   package Gpio renames  STM32F4.Gpio;
    package Eth  renames  STM32F4.o7xx.Eth;
    package R    renames  STM32F4.o7xx.Registers;
    package Thr  renames  Finrod.Thread;
@@ -51,6 +53,19 @@ package body Finrod.Net.Eth.PHY is
    Phy_Addr   : Stm.Bits_5;
    Phy_Mspeed : Stm.Bits_3;
    
+   
+   -- poll the phy interrupt in GPIOA
+   function Phy_Interrupted return Boolean
+   is
+      use type Stm.Bits_16;
+      Gpioai_Tmp : constant Stm.Bits_16 := R.GPIOa.Idr;
+   begin
+      if (Gpioai_Tmp and Stm.Bits_16 (2**Gpio.Dr3)) = 0 then
+	 return True;
+      else return False;
+      end if;
+   end Phy_Interrupted;
+	 
    
    -- poll the phy for availability
    function Phy_Available return Boolean
