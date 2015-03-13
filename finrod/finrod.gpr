@@ -1,4 +1,4 @@
-project First_Try is
+project Finrod is
 
    for Languages use ("Ada");
 
@@ -12,8 +12,9 @@ project First_Try is
 
    package Builder is
       for Default_Switches ("ada") use
-         ("-g",
-          "--RTS=/usr/gnat-arm/lib/gnat/arm-eabi/ravenscar-sfp-stm32f4");
+        ("-g",
+         "--RTS=/home/jan/MMS/programs-STM/rts");
+--          "--RTS=/usr/gnat-arm/lib/gnat/arm-eabi/ravenscar-sfp-stm32f4");
 --          "--RTS=/GNATPRO/7.2.1/lib/gnat/arm-eabi/ravenscar-sfp-stm32f4");
    end Builder;
 
@@ -25,5 +26,5 @@ project First_Try is
       for Communication_Protocol use "remote";
    end Ide;
 
-end First_Try;
+end Finrod;
 

@@ -57,7 +57,10 @@
 -- and the present one is deleted . Dont know about any queued jobs, 
 -- presumably they were started before the mixup so presumable 
 -- they could be allowed to finish.
+--
 
+pragma Warnings (Off, "*may call Last_Chance_Handler");
+pragma Warnings (Off, "*(No_Exception_Propagation) in effect");
 
 package Finrod.Thread is
    

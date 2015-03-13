@@ -31,6 +31,9 @@
 -- of the board for powerlink.
 --
 
+pragma Warnings (Off, "*may call Last_Chance_Handler");
+pragma Warnings (Off, "*(No_Exception_Propagation) in effect");
+
 with Ada.Unchecked_Conversion;
 
 with STM32F4.O7xx.Syscfg;

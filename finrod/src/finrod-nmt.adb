@@ -33,6 +33,9 @@
 -- and section 7.1.2 of EPSG DSP 301 V1.2.0
 --
 
+pragma Warnings (Off, "*may call Last_Chance_Handler");
+pragma Warnings (Off, "*(No_Exception_Propagation) in effect");
+
 with Finrod.Net.Eth.PHY;
 with Finrod.Thread;
 with Finrod.Board;

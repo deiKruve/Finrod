@@ -55,7 +55,9 @@ package Finrod.Net is
       null;
    end record;
    for Frame'Bit_Order use System.High_Order_First;
+   pragma Warnings (Off, "*no component clause");
    for Frame'Scalar_Storage_Order use System.High_Order_First;
+   pragma Warnings (On);
    -- its Big Endian
    
    subtype Frame_Address_Type is System.Address; 

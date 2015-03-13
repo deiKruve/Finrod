@@ -29,6 +29,9 @@
 --
 -- the error and log handling package
 
+pragma Warnings (Off, "*may call Last_Chance_Handler");
+pragma Warnings (Off, "*(No_Exception_Propagation) in effect");
+
 --with STM32F4;
 with Finrod.Timer;
 with Finrod.Sermon;

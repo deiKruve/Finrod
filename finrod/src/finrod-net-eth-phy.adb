@@ -30,6 +30,9 @@
 -- this is the finrod ethernet PHY interface
 -- 
 
+pragma Warnings (Off, "*may call Last_Chance_Handler");
+pragma Warnings (Off, "*(No_Exception_Propagation) in effect");
+
 with STM32F4.Gpio;
 with STM32F4.o7xx.Eth;
 with STM32F4.o7xx.Registers;

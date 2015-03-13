@@ -30,6 +30,9 @@
 -- this is the top of the finrod ethernet interface
 --
 
+pragma Warnings (Off, "*may call Last_Chance_Handler");
+pragma Warnings (Off, "*(No_Exception_Propagation) in effect");
+
 with Finrod.Net.Eth;
 with Finrod.Net.Arp;
 with Finrod.Log;

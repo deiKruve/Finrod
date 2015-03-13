@@ -53,8 +53,12 @@
 -- same for MAC addresses
 --
 
+pragma Warnings (Off, "*may call Last_Chance_Handler");
+pragma Warnings (Off, "*(No_Exception_Propagation) in effect");
+pragma Warnings (Off, "*-fstrict-volatile-bitfields]");
+
 with System.Storage_Elements;
-with Finrod.Board;
+with Finrod.Board; 
 with Finrod.Net.Eth;
 with Finrod.Net.Arptable;
 with Finrod.Sermon;
@@ -176,6 +180,7 @@ package body Finrod.Net.Arp is
       use type Stm.Bits_32;
       use type Stm.Bits_16;
       use type Stm.Byte;
+      
       F : BArp_Packet;
       for F'Address use Ba;
 
@@ -202,14 +207,18 @@ package body Finrod.Net.Arp is
 	 if Display_Xframes > 0 then Show (Ba); end if;
 	 return Stashed_For_Sending;
 	 
+	 pragma Warnings (Off);
       elsif F.Tpa = F.Spa and F.Tha = Mac_null then   
+	 pragma Warnings (On);
 	 -- arp.anouncement.
 	 if Display_Rframes > 0 then Show (Ba); end if;
 	 Arp_Table.Stash (F.Sha, F.Spa);
 	 Eth.Mark_Free (Ba);
 	 return Stashed_For_ArpTable;
 	 
+	 pragma Warnings (Off);
       elsif F.Oper = Arp_Req and F.Tpa = Board.Get_Ip_Address then
+	 pragma Warnings (On);
 	 -- regular arp request
 	 if Display_Rframes > 0 then Show (Ba); end if;
 	 Arp_Table.Stash (F.Sha, F.Spa); -- remember the sender, for later entry
@@ -219,7 +228,9 @@ package body Finrod.Net.Arp is
 	 F.Tha  := F.Sha;
 	 F.Sha  := F.Srce;
 	 declare
+	    pragma Warnings (Off);
 	    FSpa   : constant Stm.Bits_32 := F.Tpa;
+	    pragma Warnings (On);
 	    Ftpa   : constant Stm.Bits_32 := F.Spa;
 	 begin
 	    F.Tpa  := Ftpa;
@@ -234,7 +245,9 @@ package body Finrod.Net.Arp is
 	 -- must reply packets be broadcast then?
 	 if Display_Rframes > 0 then Show (Ba); end if;
 	 Arp_Table.Stash (F.Sha, F.Spa);
+	 pragma Warnings (Off);
 	 Arp_Table.Stash (F.Tha, F.Tpa);
+	 pragma Warnings (On);
 	 Eth.Mark_Free (Ba);
 	 return Stashed_For_ArpTable;
       end if;

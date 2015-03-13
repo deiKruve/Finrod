@@ -31,6 +31,8 @@
 -- 
 --
 
+pragma Warnings (Off, "*may call Last_Chance_Handler");
+pragma Warnings (Off, "*(No_Exception_Propagation) in effect");
 pragma Warnings (Off, "*is not referenced");
 
 with System.Storage_Elements;
@@ -80,7 +82,7 @@ package body Finrod.Net.Eth is
    
    -- the descriptors --
    
-   Rx_Desc_Idx : Rx_Desc_Idx_Type := 0;
+   Rx_Desc_Idx : constant Rx_Desc_Idx_Type := 0;
    Tx_Desc_Idx : Tx_Desc_Idx_Type := 0;
    
    Rx_Desc : array (Rx_Desc_Idx_type) of Ebuf.Xl_Recv_Desc_Type;
@@ -226,7 +228,7 @@ package body Finrod.Net.Eth is
    is
       Fs : Frame_Store_P_Type := Frame_Store;
    begin
-      while Fs /= null and then Fs.Free /= True loop
+      while Fs /= null and then Fs.all.Free = false loop
 	 Fs := Fs.Next;
       end loop;
       
@@ -246,7 +248,7 @@ package body Finrod.Net.Eth is
    is
       Fs : Frame_Store_P_Type := Frame_Store;
    begin
-      while Fs /= null and then Fs.Free /= True loop
+      while Fs /= null and then Fs.Free = false loop
 	 Fs := Fs.Next;
       end loop;
       
@@ -273,9 +275,9 @@ package body Finrod.Net.Eth is
       Rx_Desc (0).Rdes1.Rch   := Ebuf.Tru;
       Rx_Desc (0).Rdes1.Rbs1  := 1024;
       
-      Rx_Desc (0).Rdes2.Rbap1 := Tob (Buf (0)'address);
+      Rx_Desc (0).Rdes2.Rbap1_Rtsl := Tob (Buf (0)'address);
       Mark_Used (0);
-      Rx_Desc (0).Rdes3.Rbap2 := Tob (Rx_Desc (1)'Address);
+      Rx_Desc (0).Rdes3.Rbap2_Rtsh := Tob (Rx_Desc (1)'Address);
       ---
       Rx_Desc (1).Rdes0.Own   := Ebuf.DMA;
       
@@ -285,9 +287,9 @@ package body Finrod.Net.Eth is
       Rx_Desc (1).Rdes1.Rch   := Ebuf.Tru;
       Rx_Desc (1).Rdes1.Rbs1  := 1024;
       
-      Rx_Desc (1).Rdes2.Rbap1 := Tob (Buf (1)'address);
+      Rx_Desc (1).Rdes2.Rbap1_Rtsl := Tob (Buf (1)'address);
       Mark_Used (1);
-      Rx_Desc (1).Rdes3.Rbap2 := Tob (Rx_Desc (2)'Address);
+      Rx_Desc (1).Rdes3.Rbap2_Rtsh := Tob (Rx_Desc (2)'Address);
       ---
       Rx_Desc (2).Rdes0.Own   := Ebuf.DMA;
       
@@ -297,9 +299,9 @@ package body Finrod.Net.Eth is
       Rx_Desc (2).Rdes1.Rch   := Ebuf.Tru;
       Rx_Desc (2).Rdes1.Rbs1  := 1024;
       
-      Rx_Desc (2).Rdes2.Rbap1 := Tob (Buf (2)'address);
+      Rx_Desc (2).Rdes2.Rbap1_Rtsl := Tob (Buf (2)'address);
       Mark_Used (2);
-      Rx_Desc (2).Rdes3.Rbap2 := Tob (Rx_Desc (0)'Address);
+      Rx_Desc (2).Rdes3.Rbap2_Rtsh := Tob (Rx_Desc (0)'Address);
       ---
       --- initialize the tx descriptors, as far as known
       Tx_Desc (0).Tdes0.Own   := Ebuf.Me;
@@ -316,9 +318,9 @@ package body Finrod.Net.Eth is
       Tx_Desc (0).Tdes1.Tbs2  := 0; -- second buffer size
       Tx_Desc (0).Tdes1.Tbs1  := 0; --1024; -- to be set by appl
       
-      Tx_Desc (0).Tdes2.Tbap1 := 0; -- for the time being!!!!!
+      Tx_Desc (0).Tdes2.Tbap1_Ttsl := 0; -- for the time being!!!!!
       
-      Tx_Desc (0).Tdes3.Tbap2 := Tob (Tx_Desc (1)'Address);
+      Tx_Desc (0).Tdes3.Tbap2_Ttsh := Tob (Tx_Desc (1)'Address);
       ---
       Tx_Desc (1).Tdes0.Own   := Ebuf.Me;
       Tx_Desc (1).Tdes0.Ic    := Ebuf.Off; -- no int on completion
@@ -334,9 +336,9 @@ package body Finrod.Net.Eth is
       Tx_Desc (1).Tdes1.Tbs2  := 0; -- second buffer size
       Tx_Desc (1).Tdes1.Tbs1  := 0; --1024; -- to be set by appl
       
-      Tx_Desc (1).Tdes2.Tbap1 := 0; -- for the time being!!!!!
+      Tx_Desc (1).Tdes2.Tbap1_Ttsl := 0; -- for the time being!!!!!
       
-      Tx_Desc (1).Tdes3.Tbap2 := Tob (Tx_Desc (2)'Address);
+      Tx_Desc (1).Tdes3.Tbap2_Ttsh := Tob (Tx_Desc (2)'Address);
       ---
       Tx_Desc (2).Tdes0.Own   := Ebuf.Me;
       Tx_Desc (2).Tdes0.Ic    := Ebuf.Off; -- no int on completion
@@ -352,9 +354,9 @@ package body Finrod.Net.Eth is
       Tx_Desc (2).Tdes1.Tbs2  := 0; -- second buffer size
       Tx_Desc (2).Tdes1.Tbs1  := 0; --1024; -- to be set by appl
       
-      Tx_Desc (2).Tdes2.Tbap1 := 0; -- for the time being!!!!!
+      Tx_Desc (2).Tdes2.Tbap1_Ttsl := 0; -- for the time being!!!!!
       
-      Tx_Desc (2).Tdes3.Tbap2 := Tob (Tx_Desc (0)'Address);
+      Tx_Desc (2).Tdes3.Tbap2_Ttsh := Tob (Tx_Desc (0)'Address);
    end Init_Buffers;
    
    
@@ -584,14 +586,14 @@ package body Finrod.Net.Eth is
 	 
       else
 	 declare
-	    subtype Tdec3_Time_Type is Ebuf.Tdes3_Type (True);
-	    subtype Tdec2_Time_Type is Ebuf.Tdes2_Type (True);
+	    subtype Tdec3_Time_Type is Ebuf.Tdes3_Type;
+	    subtype Tdec2_Time_Type is Ebuf.Tdes2_Type;
 	 begin
-	    Time.Seconds := Tdec3_Time_Type (Tx_Desc (Dix).Tdes3).Ttsh;
-	    Time.Subsecs := Tdec2_Time_Type (Tx_Desc (Dix).Tdes2).Ttsl;
+	    Time.Seconds := Tdec3_Time_Type (Tx_Desc (Dix).Tdes3).Tbap2_Ttsh;
+	    Time.Subsecs := Tdec2_Time_Type (Tx_Desc (Dix).Tdes2).Tbap1_Ttsl;
 	 end;
 	 -- return the buffer
-	 Mark_Free (Toa (Tx_Desc (Dix).Tdes3.Tbap2));
+	 Mark_Free (Toa (Tx_Desc (Dix).Tdes3.Tbap2_Ttsh));
 	 return Complete;
       end if;
    end Poll_Xmit_Completed;
@@ -633,7 +635,7 @@ package body Finrod.Net.Eth is
    begin
       if Tx_Desc (Tx_Desc_Idx).Tdes0.Own = Ebuf.Me then
 	 Tx_Desc (Tx_Desc_Idx).Tdes1.Tbs1   := Stash.Frame_Len;
-	 Tx_Desc (Tx_Desc_Idx).Tdes2.Tbap1  := Tob (Stash.Frame_Addr);
+	 Tx_Desc (Tx_Desc_Idx).Tdes2.Tbap1_Ttsl  := Tob (Stash.Frame_Addr);
 	 Tx_Desc (Tx_Desc_Idx).Tdes0.Own    := Ebuf.Dma; -- control to DMA
 	 
 	 -- and start transmission
@@ -682,7 +684,7 @@ package body Finrod.Net.Eth is
 	 Tdes0_Tmp.Cic                      := Ebuf.Ck_Head_Payload; -- checksum
 	 Tx_Desc (Tx_Desc_Idx).Tdes0        := Tdes0_Tmp;
 	 Tx_Desc (Tx_Desc_Idx).Tdes1.Tbs1   := Bbc;
-	 Tx_Desc (Tx_Desc_Idx).Tdes2.Tbap1  := Tob (Ba);
+	 Tx_Desc (Tx_Desc_Idx).Tdes2.Tbap1_Ttsl  := Tob (Ba);
 	 Tdes0_Tmp.Own                      := Ebuf.Dma; -- control to DMA
 	 Tx_Desc (Tx_Desc_Idx).Tdes0        := Tdes0_Tmp;
 	 

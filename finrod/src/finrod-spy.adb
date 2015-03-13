@@ -32,6 +32,9 @@
 -- It works as described in finrod-thread.ads
 --
 
+pragma Warnings (Off, "*may call Last_Chance_Handler");
+pragma Warnings (Off, "*(No_Exception_Propagation) in effect");
+
 --with System;
 with Finrod.Board;
 with Finrod.Sermon;

@@ -1,8 +1,8 @@
 
---with System.Unsigned_Types;
+--with System.Unsigned_Types;   -- for arm only
 with STM32F4.o7xx.Eth;
 with STM32F4.O7xx.Registers;
---with Img_Uns;
+--with Img_Uns;                 -- for arm only
 
 package body Finrod.Timer is
    package Stm renames STM32F4;
@@ -67,9 +67,9 @@ package body Finrod.Timer is
    is
       S : constant String := 
 	--Unsigned.Image (System.Unsigned_Types.Unsigned (T.Seconds)) & "." & 
-	--Unsigned.Image (System.Unsigned_Types.Unsigned (T.Subsecs));
+	--Unsigned.Image (System.Unsigned_Types.Unsigned (T.Subsecs));  -- for arm
 	Stm.Bits_32'Image (T.Seconds) & "." & 
-	Stm.Bits_32'Image (T.Subsecs);
+	Stm.Bits_32'Image (T.Subsecs);            -- for dell
    begin
       return S;
    end Image;

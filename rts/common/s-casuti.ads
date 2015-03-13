@@ -1,8 +1,12 @@
 ------------------------------------------------------------------------------
 --                                                                          --
---                             GNAT EXAMPLE                                 --
+--                         GNAT RUN-TIME COMPONENTS                         --
 --                                                                          --
---             Copyright (C) 2014, Free Software Foundation, Inc.           --
+--                     S Y S T E M . C A S E _ U T I L                      --
+--                                                                          --
+--                                 S p e c                                  --
+--                                                                          --
+--          Copyright (C) 1995-2013, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -25,28 +29,38 @@
 --                                                                          --
 ------------------------------------------------------------------------------
 
---  The file declares the main procedure for the demonstration.
+--  Simple casing functions
 
---pragma Restrictions (Max_tasks => 1);
+--  This package provides simple casing functions that do not require the
+--  overhead of the full casing tables found in Ada.Characters.Handling.
 
-with Finrod.Nmt;               pragma Unreferenced (Finrod.Nmt);
---  The Driver package contains the task that actually controls the app so
---  although it is not referenced directly in the main procedure, we need it
---  in the closure of the context clauses so that it will be included in the
---  executable.
+--  Note that all the routines in this package are available to the user
+--  via GNAT.Case_Util, which imports all the entities from this package.
 
---with Last_Chance_Handler;  pragma Unreferenced (Last_Chance_Handler);
---  The "last chance handler" is the user-defined routine that is called when
---  an exception is propagated. We need it in the executable, therefore it
---  must be somewhere in the closure of the context clauses.
+pragma Compiler_Unit_Warning;
 
---with Timer;  pragma Unreferenced (Timer);
--- until we have used it
+package System.Case_Util is
+   pragma Pure;
 
-procedure Demo is
-   --pragma Priority (System.Priority'First);
-begin
-   loop
-      null;
-   end loop;
-end Demo;
+   --  Note: all the following functions handle the full Latin-1 set
+
+   function To_Upper (A : Character) return Character;
+   --  Converts A to upper case if it is a lower case letter, otherwise
+   --  returns the input argument unchanged.
+
+   procedure To_Upper (A : in out String);
+   --  Folds all characters of string A to upper case
+
+   function To_Lower (A : Character) return Character;
+   --  Converts A to lower case if it is an upper case letter, otherwise
+   --  returns the input argument unchanged.
+
+   procedure To_Lower (A : in out String);
+   --  Folds all characters of string A to lower case
+
+   procedure To_Mixed (A : in out String);
+   --  Converts A to mixed case (i.e. lower case, except for initial
+   --  character and any character after an underscore, which are
+   --  converted to upper case.
+
+end System.Case_Util;
