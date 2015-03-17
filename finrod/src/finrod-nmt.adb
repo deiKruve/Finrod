@@ -89,6 +89,7 @@ package body Finrod.Nmt is
 	       
 	       -- board.set_master_ip_address  -- if special
 	       
+	       R.GPIOC.Bsrr := R.GPIOC.Bsrr or 2 ** Gpio.Bs13; -- led on
 	       Log.Log ("finished Nmt_Initialising.");
 	       Fsm_State := Nmt_Reset_Phy;
 	       
@@ -134,6 +135,7 @@ package body Finrod.Nmt is
 	       
 	    when Nmt_Wait_Configuration_Ok      =>  
 	       Log.Log ("Initialization Stage completed succesfully.");
+	       R.GPIOC.Bsrr := R.GPIOC.Bsrr or 2 ** Gpio.Br13; -- led off
 	       Fsm_State := Nmt_Ready;
 	       
 	    when Nmt_Ready                      =>

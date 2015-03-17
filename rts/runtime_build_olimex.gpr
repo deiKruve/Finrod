@@ -1,4 +1,4 @@
-project Runtime_Build is
+project Runtime_Build_Olimex is
   for Languages use ("Ada", "Asm_Cpp");
 
   for Library_Auto_Init use "False";
@@ -8,10 +8,10 @@ project Runtime_Build is
   for Library_Dir use "adalib/";
   for Object_Dir use "obj/";
 
-  for Source_Dirs use ("arch/stm32f4/**", "arch/**", "common/**", "board-common/**");
-  
+  for Source_Dirs use ("arch/stm32f4-olimex", "arch/", "common/**", "board-common/**");
+
   for Target use "arm-eabi";
-  
+
   type Build_Type is ("Production", "Debug");
 
   Build : Build_Type := external ("BUILD", "Production");
@@ -51,4 +51,4 @@ project Runtime_Build is
      for Switches ("s-assert.adb") use ALL_ADAFLAGS & ("-g");
      for Switches ("a-tags.adb") use ALL_ADAFLAGS & ("-g");
   end Compiler;
-end Runtime_Build;
+end Runtime_Build_Olimex;
