@@ -278,6 +278,12 @@ package body Finrod.Board is
       	 cPupdr_Tmp (6 .. 7)   := (others => Gpio.Pull_Up);
       	 cAfrl_Tmp (6 .. 7)    := (others => Gpio.Af7);
 	 ----------------------------------------------
+	 -- set up the LED on PC13
+	 cModer_Tmp (13)       := Gpio.Output;
+	 cOspeedr_Tmp (13)     := Gpio.Speed_2MHz;
+	 cOtyper_Tmp (13)      := Gpio.Open_Drain;
+	 cPupdr_Tmp (13)       := Gpio.Pull_Up;
+	 ----------------------------------------------
 	 -- write to hardware
 	 R.GPIOc.Moder         := CModer_Tmp;  
 	 R.GPIOc.Ospeedr       := COspeedr_Tmp;
