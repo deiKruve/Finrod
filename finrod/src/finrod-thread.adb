@@ -35,6 +35,9 @@
 pragma Warnings (Off, "*may call Last_Chance_Handler");
 pragma Warnings (Off, "*(No_Exception_Propagation) in effect");
 
+with System;
+with Ada.Unchecked_Conversion;
+
 with Finrod.Timer;
 
 package body Finrod.Thread is
@@ -44,22 +47,30 @@ package body Finrod.Thread is
    -- constants,                 --
    -- definitions and local vars --
    --------------------------------
+   type Job_Entry_Type;
+   type Job_Entry_P_Type is access all Job_Entry_Type;
+   type Job_Entry_Type is 
+      record
+	 Next : Job_Entry_P_Type;
+	 Job : System.Address; --  Job_Proc_P_Type;
+      end record;
    
-   
+  
    -- This is Just The Root Pointer, once the first item is added
    -- it will be a null terminated list.
+   Job_List : Job_Entry_P_Type := null; 
    Free_List : Job_Entry_P_Type := null; 
    
    
    ----------------------
    -- public interface --
    ----------------------
-   
+   Job_Entry : Job_Entry_P_Type;
    -- add some routine on the stack
    -- for executing after the present load is completed
    procedure Insert_Job (Ds : Job_Proc_P_Type)
    is
-      Job_Entry : Job_Entry_P_Type;
+      --Job_Entry : Job_Entry_P_Type;
    begin
       -- check for reusable structs
       if Free_List /= null then
@@ -70,7 +81,7 @@ package body Finrod.Thread is
       end if;
       
       -- link it into the job chain
-      Job_Entry.Job  := Ds;
+      Job_Entry.Job  := Ds.all'Address;
       Job_Entry.Next := Job_List;
       Job_List       := Job_Entry;
    end Insert_Job;
@@ -78,11 +89,12 @@ package body Finrod.Thread is
    
    -- delete a job (like in the case of a routine with a loop)
    procedure Delete_Job (Ds : Job_Proc_P_Type)
-   is
+   is 
+      use type System.Address;
       Job_Entry : Job_Entry_P_Type := Job_List;
       Prev_Job  : Job_Entry_P_Type;
    begin
-      while Job_Entry /= null and then Job_Entry.Job /= Ds loop
+      while Job_Entry /= null and then Job_Entry.Job /= Ds.all'Address loop
 	 Prev_Job  := Job_Entry;
 	 Job_Entry := Job_Entry.Next;
       end loop;
@@ -103,6 +115,9 @@ package body Finrod.Thread is
    -- start executing the job stack
    procedure Scan
    is
+      function Toac is new 
+	Ada.Unchecked_Conversion (Source => System.Address,
+				  Target => Job_Proc_P_Type);
       Job_Entry : Job_Entry_P_Type;
    begin
       -- maybe we only do one scan at a time so if
@@ -111,7 +126,7 @@ package body Finrod.Thread is
 	 Timer.Start_Timer;---------------------------for testing
 	 Job_Entry    := Job_List;
 	 while Job_Entry /= null loop
-	    Job_Entry.Job.all;
+	    Toac (Job_Entry.Job).all;
 	    Job_Entry := Job_Entry.Next;
 	 end loop;
 	 Timer.Stop_Timer;-----------------------------for testing

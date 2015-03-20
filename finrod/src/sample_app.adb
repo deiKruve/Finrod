@@ -28,15 +28,16 @@
 ------------------------------------------------------------------------------
 --
 
-with STM32F4;
-with Finrod.Board;
+--  with STM32F4;
 with Finrod.Nmt;
-with Finrod.App;
+--  with Finrod.Board;
+
+--  with Finrod.App;
 
 package body Sample_App is
 
-   package Stm  renames STM32F4;
-   package Board renames Finrod.Board;
+ --  package Stm  renames STM32F4;
+ --  package Board renames Finrod.Board;
    
    procedure Init
    is

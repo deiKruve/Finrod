@@ -57,9 +57,10 @@ procedure Setup_Pll is
    --  values have been calculated for a 168 MHz system clock from an external
    --  8 MHz HSE clock. The PLL values are used when Activate_PLL is True.
 
-   --jdk HSECLK          : constant HSECLK_Range := 8_000_000; -- ext. clock is 8 MHz
+   --  jdk HSECLK          : constant HSECLK_Range := 8_000_000;
+   --  --  ext. clock is 8 MHz
    HSECLK      : constant HSECLK_Range := 12_000_000; -- ext. clock is 12 MHz
-   
+
    HSE_Enabled     : constant Boolean := True;  -- use high-speed ext. clock
    HSE_Bypass      : constant Boolean := False; -- don't bypass ext. resonator
    LSI_Enabled     : constant Boolean := True;  -- use low-speed internal clock
@@ -79,7 +80,7 @@ procedure Setup_Pll is
    --  PLLN_Value  : constant := 336;   -- multiplier in range 192 .. 432
    --  PLLP_Value  : constant := 2;     -- divider may be 2, 4, 6 or 8
    --  PLLQ_Value  : constant := 7;     -- multiplier in range 2 .. 15
-       
+
    PLLM_Value  : constant := 8;  -- divider, makes 1.5
    PLLN_Value  : constant := 224; -- multiplier, makes 336 MegHz vco freq
    PLLP_Value  : constant := 2;  -- divider, makes 168 MHz
@@ -135,7 +136,7 @@ procedure Setup_Pll is
                  when RCC_CFGR.PPRE2_DIV8  => HCLK / 8,
                  when RCC_CFGR.PPRE2_DIV16 => HCLK / 16,
                  when others => raise Program_Error);
-
+   pragma Unreferenced (PCLK2);
    --  Local Subprograms
 
    function "and" (Left, Right : Word) return Boolean is
@@ -144,7 +145,7 @@ procedure Setup_Pll is
    procedure Reset (Register : in out Word; Mask : Word);
    procedure Set (Register : in out Word; Mask : Word);
 
-   procedure Initialize_USART1 (Baudrate : Positive);
+   --  procedure Initialize_USART1 (Baudrate : Positive);
    procedure Initialize_Clocks;
    procedure Reset_Clocks;
 
@@ -285,37 +286,8 @@ procedure Setup_Pll is
       RCC.CIR := 0;
    end Reset_Clocks;
 
-   -----------------------
-   -- Initialize_USART1 --
-   -----------------------
-
-   --  procedure Initialize_USART1 (Baudrate : Positive) is
-   --     use GPIO;
-   --     APB_Clock    : constant Positive := PCLK2;
-   --     Int_Divider  : constant Positive := (25 * APB_Clock) / (4 * Baudrate);
-   --     Frac_Divider : constant Natural := Int_Divider rem 100;
-   --     BRR          : Bits_16;
-   --  begin
-   --     RCC.APB2ENR := RCC.APB2ENR or RCC_APB2ENR_USART1;
-   --     RCC.AHB1ENR := RCC.AHB1ENR or RCC_AHB1ENR_GPIOB;
-
-   --     GPIOB.MODER   (6 .. 7) := (Mode_AF,     Mode_AF);
-   --     GPIOB.OSPEEDR (6 .. 7) := (Speed_50MHz, Speed_50MHz);
-   --     GPIOB.OTYPER  (6 .. 7) := (Type_PP,     Type_PP);
-   --     GPIOB.PUPDR   (6 .. 7) := (Pull_Up,     Pull_Up);
-   --     GPIOB.AFRL    (6 .. 7) := (AF_USART1,   AF_USART1);
-
-   --     BRR := (Bits_16 (Frac_Divider * 16) + 50) / 100 mod 16
-   --              or Bits_16 (Int_Divider / 100 * 16);
-
-   --     USART1.BRR := BRR;
-   --     USART1.CR1 := USART.CR1_UE or USART.CR1_RE or USART.CR1_TE;
-   --     USART1.CR2 := 0;
-   --     USART1.CR3 := 0;
-   --  end Initialize_USART1;
-
 begin
-   Reset_Clocks;
-   Initialize_Clocks;
+      Reset_Clocks;
+      Initialize_Clocks;
    --  Initialize_USART1 (115_200);
 end Setup_Pll;

@@ -33,8 +33,14 @@
 -- and section 7.1.2 of EPSG DSP 301 V1.2.0
 --
 
-pragma Warnings (Off, "*may call Last_Chance_Handler");
-pragma Warnings (Off, "*(No_Exception_Propagation) in effect");
+---pragma Warnings (Off, "*may call Last_Chance_Handler");
+---pragma Warnings (Off, "*(No_Exception_Propagation) in effect");
+
+with finrod.Last_Chance_Handler; -- in testing
+-- in testing
+
+with STM32F4.O7xx.Registers;
+with STM32F4.Gpio;
 
 with Finrod.Net.Eth.PHY;
 with Finrod.Thread;
@@ -45,15 +51,20 @@ with Finrod.Log;
 
 package body Finrod.Nmt is
    
-   package Thr renames Finrod.Thread;
-   package Eth renames Finrod.Net.Eth;
-   package Phy renames Finrod.Net.Eth.PHY;
-   package Spy renames Finrod.Spy;
+   package Stm  renames STM32F4;
+   package Gpio renames STM32F4.Gpio;
+   package R    renames STM32F4.O7xx.Registers;
+   package Thr  renames Finrod.Thread;
+   package Eth  renames Finrod.Net.Eth;
+   package Phy  renames Finrod.Net.Eth.PHY;
+   package Spy  renames Finrod.Spy;
    
    --------------------------------
    -- constants,                 --
    -- definitions and local vars --
    --------------------------------
+   
+   Lch_Message : String := "finrod-nmt done!";
    
    Fsm_State : State_Selector_Type := Nmt_Powered;
    
@@ -68,6 +79,7 @@ package body Finrod.Nmt is
    -- therefor the case discriminator in enclosed in a while loop
    procedure Fsm
    is
+      use type Stm.Word;
       use type Eth.State_Selector_Type;
       use type Phy.State_Selector_Type;
    begin
@@ -80,6 +92,7 @@ package body Finrod.Nmt is
 	       -- Initialize the basic board with comms, timer, etc
 	       -- insofar not done on the ada startup layer
 	       Finrod.Board.Init_Pins;
+	       Timer.Reset;
 	       Timer.Init;
 	       Spy.Insert_Spy; -- so we have a V24 interface.
 	       
@@ -142,6 +155,9 @@ package body Finrod.Nmt is
 	       Fsm_State := Nmt_Ready;
 	       
 	    when Nmt_Ready                      =>
+	       Last_Chance_Handler.Last_Chance_Handler 
+		 (Msg  => Lch_Message'Address,
+		  Line => 156); -- done in the test setup
 	       null;----------------------------------carry on here
 	 end case;
 	 
@@ -176,7 +192,7 @@ package body Finrod.Nmt is
    begin
       Fsm_State := Nmt_Initialising;
       --Thr.Insert_Job (Fsm'Access);
-      Fsm;
+      --Fsm;
       -- and go to the next looped fsm here
       -- like pre-stage1.
    end Reset;

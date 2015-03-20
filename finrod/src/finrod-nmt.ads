@@ -47,7 +47,7 @@ package Finrod.Nmt is
 				Nmt_Wait_Configuration_Ok,
 				Nmt_ready);
    
-   -- dont need this -- procedure Fsm;
+   procedure Fsm;
    -- the init state machine
    -- insert it into the run thread to srt the board. or!????
    -- i think we will just start it at elaboration time;

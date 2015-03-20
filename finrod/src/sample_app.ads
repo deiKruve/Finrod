@@ -28,8 +28,8 @@
 ------------------------------------------------------------------------------
 --
 
-
 package Sample_App is
+   pragma Elaborate_Body;
    
    procedure Init;
    -- initializes the application,

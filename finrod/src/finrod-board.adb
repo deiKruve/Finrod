@@ -105,6 +105,10 @@ package body Finrod.Board is
    begin
       --  RCC reset registers
       declare
+         RCC_CR_Tmp   : Rcc.CR_Register      := R.Rcc.Cr;         -- test
+         pragma unreferenced (RCC_CR_Tmp);
+         PLLCFGR_Tmp  : Rcc.PLLCFG_Register  := R.Rcc.PLLCFGR;    -- test
+         pragma unreferenced (PLLCFGR_Tmp);
 	 Ahb1rst_Tmp  : Rcc.AHB1RST_Register := R.Rcc.AHB1RSTR;
 	 --Apb1rst_Tmp  : Rcc.APB1RST_Register := R.Rcc.APB1RSTR;
 	 Apb2rst_Tmp  : Rcc.APB2RST_Register := R.Rcc.APB2RSTR;
@@ -134,6 +138,18 @@ package body Finrod.Board is
 	 -- write to hardware
 	 R.Rcc.AHB1RSTR       := Ahb1rst_Tmp;
 	 --R.Rcc.APB1RST        := APB1RST_Tmp;
+	 R.Rcc.APB2RSTR       := Apb2rst_Tmp;
+	 
+	 Ahb1rst_Tmp.ETHMAC   := Rcc.Off; -- pulse it, according to cube
+	 Ahb1rst_Tmp.DMA1     := Rcc.Off;
+	 Ahb1rst_Tmp.DMA2     := Rcc.Off;
+	 Ahb1rst_Tmp.GPIOA    := Rcc.Off;
+	 Ahb1rst_Tmp.GPIOB    := Rcc.Off;
+	 Ahb1rst_Tmp.GPIOC    := Rcc.Off;
+	 Ahb1rst_Tmp.GPIOG    := Rcc.Off;
+	 R.Rcc.AHB1RSTR       := Ahb1rst_Tmp;
+	 Apb2rst_Tmp.Uart1    := Rcc.Off;
+	 Apb2rst_Tmp.Uart6    := Rcc.Off;
 	 R.Rcc.APB2RSTR       := Apb2rst_Tmp;
       end;
       

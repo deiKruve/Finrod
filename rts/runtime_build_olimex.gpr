@@ -50,5 +50,6 @@ project Runtime_Build_Olimex is
      for Switches ("s-excdeb.adb") use ALL_ADAFLAGS & ("-g", "-O0");
      for Switches ("s-assert.adb") use ALL_ADAFLAGS & ("-g");
      for Switches ("a-tags.adb") use ALL_ADAFLAGS & ("-g");
+     for Switches ("s-memory.adb") use ALL_ADAFLAGS & ("-g", "-O0");
   end Compiler;
 end Runtime_Build_Olimex;

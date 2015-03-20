@@ -29,8 +29,8 @@
 
 --pragma Restrictions (Max_tasks => 1);
 
-with Finrod.Nmt;               pragma Unreferenced (Finrod.Nmt);
---  The Driver package contains the task that actually controls the app so
+with Finrod.Nmt;               --pragma Unreferenced (Finrod.Nmt);
+--  The Driver package that contains the task that actually controls the app so
 --  although it is not referenced directly in the main procedure, we need it
 --  in the closure of the context clauses so that it will be included in the
 --  executable.
@@ -40,13 +40,17 @@ with Finrod.Nmt;               pragma Unreferenced (Finrod.Nmt);
 --  an exception is propagated. We need it in the executable, therefore it
 --  must be somewhere in the closure of the context clauses.
 
---with Timer;  pragma Unreferenced (Timer);
--- until we have used it
+with Sample_App;  pragma Unreferenced (Sample_App);
+-- this is the name of the custom application
+-- it will set some uplinks to Finrod.Nmt so nmt can execute it.
+-- it is unreferenced here, but it must be included for the uplinks to be set 
+-- at elaboration time.
 
 procedure Demo is
    --pragma Priority (System.Priority'First);
 begin
-   loop
-      null;
-   end loop;
+   Finrod.Nmt.Fsm;
+   --  loop
+   --     null;
+   --  end loop;
 end Demo;

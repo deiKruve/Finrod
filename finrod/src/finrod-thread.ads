@@ -67,9 +67,6 @@ package Finrod.Thread is
    
    type Job_Proc_P_Type is not null access procedure;
    
-   type Job_Entry_Type is private;
-   type Job_Entry_P_Type is access all Job_Entry_Type;
-   
    procedure Insert_Job (Ds : Job_Proc_P_Type);
    -- add some routine on the stack
    -- for executing after the present load is completed
@@ -80,17 +77,5 @@ package Finrod.Thread is
    procedure Scan;
    -- start executing the job stack forever, unless there is no job
    -- but this is not legal, since then the whole system hangs.
-   
-   Job_List : Job_Entry_P_Type := null; 
-   -- This is Just The Root Pointer, once the first item is added
-   -- it will be a null terminated list.
-   
-private
-   
-   type Job_Entry_Type is 
-      record
-	 Next : Job_Entry_P_Type;
-	 Job : Job_Proc_P_Type;
-      end record;
-   
+
 end Finrod.Thread;

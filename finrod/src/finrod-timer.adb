@@ -19,11 +19,30 @@ package body Finrod.Timer is
    Min_Duration : Time_type := (0, 0);
    Max_duration : Time_type := (0, 0);
    
+   Timer1       : Time_type := (0, 0);
+   timer2       : Time_type := (0, 0);
+   timer3       : Time_type := (0, 0);
+   
    
    ------------------------------------
    -- some operations on 'Time_Type' --
    -- part of interface;             --
    ------------------------------------
+   
+   function "+" (Left, Right : Time_Type) return Time_Type
+   is
+      use type Stm.Bits_32;
+      D : Time_Type := (0, 0);
+   begin
+      D.Subsecs := Left.Subsecs + Right.Subsecs;
+      if D.Subsecs > 999_999_999 then
+	 D.Subsecs := (D.Subsecs - 1_000_000_000);
+	 D.Seconds := Left.Seconds + Right.Seconds + 1;
+      else
+	 D.Seconds := Left.Seconds + Right.Seconds;
+      end if;
+      return D;
+   end "+";
    
    function "-" (Left, Right : Time_Type) return Time_Type
    is
@@ -31,8 +50,8 @@ package body Finrod.Timer is
       D : Time_Type := (0, 0);
    begin
       D.Subsecs := Left.Subsecs - Right.Subsecs;
-      if D.Subsecs > 2**31 then
-	 D.Subsecs := D.Subsecs + 2**31;
+      if D.Subsecs > 999_999_999 then           --  2**31 then
+	 D.Subsecs := (D.Subsecs + 1_000_000_000);-- and (2**31 - 1);
 	 D.Seconds := Left.Seconds - Right.Seconds - 1;
       else
 	 D.Seconds := Left.Seconds - Right.Seconds;
@@ -88,9 +107,9 @@ package body Finrod.Timer is
       T.Subsecs := Stm.Bits_32 (R.Eth_Mac.Ptptslr.Stss);
       -- read it again to check for roll-over
       if  R.Eth_Mac.Ptptshr > T.Seconds then
-	 if T.Subsecs > 2**30 then
+	 if T.Subsecs > 444_444_445 then
 	    return T;
-	 else -- the bugger rolled over
+	 else -- the bugger rolled over between readings
 	    T.Seconds := T.Seconds + 1;
 	    return T;
 	 end if;
@@ -156,17 +175,92 @@ package body Finrod.Timer is
    
    -- starts this timer
    -- use done1 to check for completion
-   procedure Start_Timer1 (Secs : Stm.Bits_31; Subsecs : Stm.Bits_32)
+   procedure Start_Timer1 (Secs : Stm.Bits_32; Subsecs : Stm.Bits_32)
    is
+      T : constant Time_Type := (Secs, Subsecs);
    begin
-      null;
+      Timer1 := Read_Time + T;
    end Start_Timer1;
+   
+   
+   -- returns the fractional part of the time to go on timer 1
+   function Time1_Subsecs_Togo return Stm.Bits_32
+   is 
+      T : constant Time_Type := Timer1 - Read_Time;
+   begin
+      return T.Subsecs;
+   end Time1_Subsecs_Togo;
    
    
    -- check timer1 for completion
    -- use Start_Timer1 to start it.
    function Done1 return Boolean
-   is (True);
+   is
+   begin
+      if Read_Time > Timer1 then return True;
+      else return False;
+      end if;
+   end Done1;
+   
+   
+   -- starts this timer
+   -- use done2 to check for completion
+   procedure Start_Timer2 (Secs : Stm.Bits_32; Subsecs : Stm.Bits_32)
+   is
+      T : constant Time_Type := (Secs, Subsecs);
+   begin
+      Timer2 := Read_Time + T;
+   end Start_Timer2;
+   
+   
+   -- returns the fractional part of the time to go on timer 2
+   function Time2_Subsecs_Togo return Stm.Bits_32
+   is 
+      T : constant Time_Type := Timer2 - Read_Time;
+   begin
+      return T.Subsecs;
+   end Time2_Subsecs_Togo;
+   
+   
+   -- check timer2 for completion
+   -- use Start_Timer2 to start it.
+   function Done2 return Boolean
+   is
+   begin
+      if Read_Time > Timer2 then return True;
+      else return False;
+      end if;
+   end Done2;
+   
+   
+   -- starts this timer
+   -- use done3 to check for completion
+   procedure Start_Timer3 (Secs : Stm.Bits_32; Subsecs : Stm.Bits_32)
+   is
+      T : constant Time_Type := (Secs, Subsecs);
+   begin
+      Timer3 := Read_Time + T;
+   end Start_Timer3;
+   
+   
+   -- returns the fractional part of the time to go on timer 3
+   function Time3_Subsecs_Togo return Stm.Bits_32
+   is 
+      T : constant Time_Type := Timer3 - Read_Time;
+   begin
+      return T.Subsecs;
+   end Time3_Subsecs_Togo;
+   
+   
+   -- check timer3 for completion
+   -- use Start_Timer3 to start it.
+   function Done3 return Boolean
+   is
+   begin
+      if Read_Time > Timer3 then return True;
+      else return False;
+      end if;
+   end Done3;
    
    
    procedure Init
@@ -184,12 +278,18 @@ package body Finrod.Timer is
       
       -- enable time stamping
       Ptpt_Control_Tmp.Tse   := Eth.Enabled;
+      Ptpt_Control_Tmp.TSSSR := Eth.On;  --  999 999 999  roll over
+      --  Ptpt_Control_Tmp.TSSIPV4FE := Eth.Enabled;
+      --  Ptpt_Control_Tmp.TSSARFE   := Eth.Enabled;
+      --  and some others, wait for later
       R.Eth_Mac.PTPTSCR      := Ptpt_Control_Tmp; -- write it
       
       -- set the time increase per tick --
       -- 10^9/2^31 nsecs / division in the counter
       -- so for 7 nsecs resolution add (7 * 2^31 / 10^9) per tick (scales to 7)
-      PTP_SSIR_Tmp.Stssi     := 15;
+      -- but this was for binary roll over!
+      -- for decimal roll-over just make it 7
+      PTP_SSIR_Tmp.Stssi     := 7;  --  15;
       R.Eth_Mac.PTPSSIR      := PTP_SSIR_Tmp;  -- write it;
       
       -- figute out the update frequency --
@@ -197,7 +297,7 @@ package body Finrod.Timer is
       --    10^9 / 7 = 142_857_143 Hz.
       -- the addent then must be 
       --    2^32 * 142_857_143 / 168_000_000 = 3_652_183_076
-      R.Eth_Mac.PTPTSAR      := 3_652_183_076; -- write it direct its 32 bits
+      R.Eth_Mac.PTPTSAR      := 3_652_183_076; -- write it direct, its 32 bits
       
       -- update it, and wait for it to be done
       Ptpt_Control_Tmp.Tsaru := Eth.Update;
@@ -222,7 +322,4 @@ package body Finrod.Timer is
    end Init;
    
    
-begin
-   Reset;
-   Init;
 end Finrod.Timer;
