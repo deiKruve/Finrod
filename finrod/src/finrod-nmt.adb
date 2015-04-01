@@ -37,7 +37,7 @@
 ---pragma Warnings (Off, "*(No_Exception_Propagation) in effect");
 
 with finrod.Last_Chance_Handler; -- in testing
--- in testing
+Pragma Unreferenced (finrod.Last_Chance_Handler);-- in testing
 
 with STM32F4.O7xx.Registers;
 with STM32F4.Gpio;
@@ -45,6 +45,7 @@ with STM32F4.Gpio;
 with Finrod.Net.Eth.PHY;
 with Finrod.Thread;
 with Finrod.Board;
+with Finrod.Sermon;
 with Finrod.Spy;
 with Finrod.Timer;
 with Finrod.Log;
@@ -65,6 +66,7 @@ package body Finrod.Nmt is
    --------------------------------
    
    Lch_Message : String := "finrod-nmt done!";
+   Pragma Unreferenced (Lch_Message);
    
    Fsm_State : State_Selector_Type := Nmt_Powered;
    
@@ -83,15 +85,26 @@ package body Finrod.Nmt is
       use type Eth.State_Selector_Type;
       use type Phy.State_Selector_Type;
    begin
-      while Fsm_State /= Nmt_Ready loop
+      --while Fsm_State /= Nmt_Ready loop
+      loop
 	 case Fsm_State is
 	    when Nmt_Powered                    =>
 	       Fsm_State := Nmt_Initialising;
 	       
 	    when Nmt_Initialising               =>
 	       -- Initialize the basic board with comms, timer, etc
-	       -- insofar not done on the ada startup layer
-	       Finrod.Board.Init_Pins;
+	       Board.Init_Clocks; -- but not the eth clock
+	       Eth.Set_Eth_Interface;
+	       Board.Init_Pins;
+	       -- the running light must be off here, (for diagnostics) 
+	       R.GPIOC.Bsrr := R.GPIOC.Bsrr or 2 ** Gpio.Bs13;
+	       -- start the eth clock and resets the eth block
+	       Eth.Init_Eth_Clock;
+	       --  Start The Uart so we have a terminal
+	       Finrod.Sermon.Init_Usart6;
+	       -- reset all eth registers to default.
+	       Eth.Soft_Reset;
+	       -- the ptp timer and derivatives
 	       Timer.Reset;
 	       Timer.Init;
 	       Spy.Insert_Spy; -- so we have a V24 interface.
@@ -105,7 +118,7 @@ package body Finrod.Nmt is
 	       
 	       -- board.set_master_ip_address  -- if special
 	       
-	       R.GPIOC.Bsrr := R.GPIOC.Bsrr or 2 ** Gpio.Bs13; -- led on
+	       R.GPIOC.Bsrr := R.GPIOC.Bsrr or 2 ** Gpio.Br13; -- led on
 	       Log.Log ("finished Nmt_Initialising.");
 	       Fsm_State := Nmt_Reset_Phy;
 	       
@@ -142,23 +155,28 @@ package body Finrod.Nmt is
 		  Fsm_State := Nmt_Reset_Configuration;
 	       end if;
 	       Thr.Scan;
+	       
 	    when Nmt_Reset_Configuration        =>  
 	       -- Could Be Used As A Restart After parms
-	       -- have been changed trough the net.
+	       -- have been changed through the net.
 	       null;
 	       Fsm_State := Nmt_Wait_Configuration_Ok;
 	       Thr.Scan;
 	       
 	    when Nmt_Wait_Configuration_Ok      =>  
-	       Log.Log ("Initialization Stage completed succesfully.");
-	       R.GPIOC.Bsrr := R.GPIOC.Bsrr or 2 ** Gpio.Br13; -- led off
+	       Log.Log ("Initialization succesful.");
+	       R.GPIOC.Bsrr := R.GPIOC.Bsrr or 2 ** Gpio.Bs13; -- led off
 	       Fsm_State := Nmt_Ready;
 	       
 	    when Nmt_Ready                      =>
-	       Last_Chance_Handler.Last_Chance_Handler 
-		 (Msg  => Lch_Message'Address,
-		  Line => 156); -- done in the test setup
-	       null;----------------------------------carry on here
+	       loop
+		  Thr.Scan;
+	       end loop;
+	       --    the following is now dead code
+	       --  Last_Chance_Handler.Last_Chance_Handler 
+	       --  	 (Msg  => Lch_Message'Address,
+	       --  	  Line => 156); -- done in the test setup
+	       --  null;----------------------------------carry on here
 	 end case;
 	 
 	 -- error handling:

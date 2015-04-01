@@ -42,7 +42,8 @@ with Interfaces;
 with STM32F4.o7xx.Ethbuf;
 with STM32F4.o7xx.Eth;
 with STM32F4.o7xx.Registers;
-
+with STM32F4.O7xx.Syscfg;
+with STM32F4.O7xx.Rcc;
 with Finrod.Board;
 with Finrod.Thread;
 with Finrod.Log;
@@ -56,7 +57,8 @@ package body Finrod.Net.Eth is
    package Eth  renames  STM32F4.o7xx.Eth;
    package R    renames  STM32F4.o7xx.Registers;
    package Thr  renames  Finrod.Thread;
-   
+   package Rcc  renames STM32F4.O7xx.Rcc;
+   package Scfg renames STM32F4.O7xx.Syscfg;
    
    ------------------------------
    -- some types and constants --
@@ -111,8 +113,6 @@ package body Finrod.Net.Eth is
    Error_Rdes0 : Stm.Bits_32 := 0;
    
    --  last received frame --
-   
-   
    
    
    ----------------------
@@ -262,7 +262,7 @@ package body Finrod.Net.Eth is
       end if;
    end Find_Free;
    
-   
+
    procedure Init_buffers
    is
    begin
@@ -359,21 +359,7 @@ package body Finrod.Net.Eth is
       Tx_Desc (2).Tdes3.Tbap2_Ttsh := Tob (Tx_Desc (0)'Address);
    end Init_Buffers;
    
-   
-   -- next section, do a warm dma reset incase this was a warm init.
-   procedure Dma_Reset
-   is
-      use type Stm.Bits_1;
-      Dmabmr_Tmp : Eth.DMABMR_Register := R.Eth_Mac.DMABMR;
-   begin
-      Dmabmr_Tmp.SR := Eth.Reset;
-      R.Eth_Mac.DMABMR := Dmabmr_Tmp;
-      while Dmabmr_Tmp.SR /= Eth.Off loop
-	 Dmabmr_Tmp := R.Eth_Mac.DMABMR;
-      end loop;
-   end Dma_Reset;
-   
-   
+
    -- sets the dna bus mode and enables interrupts if needed
    -- sets first descriptor addresses
    procedure Set_Dma_Busmode
@@ -420,7 +406,7 @@ package body Finrod.Net.Eth is
 	 Address  : constant Ifce.Unsigned_64  := 
 	   Ifce.Unsigned_64 (Board.Get_Bcast_Address);
       begin
-	 R.Eth_Mac.MACA1LR  := Stm.Bits_32 (Address);
+	 R.Eth_Mac.MACA1LR  := Stm.Bits_32 (Address and 16#ffff_ffff#);
 	 MACA1HR_Tmp.MACA1H := Stm.Bits_16 (Ifce.Shift_Right (Address, 32));
 	 MACA1HR_Tmp.Ae     := Eth.Enabled;
 	 MACA1HR_Tmp.Sa     := Eth.Maca_Da;
@@ -707,6 +693,65 @@ package body Finrod.Net.Eth is
    end Send_Frame;
    
    
+   --------------------------
+   --  for initialization  --
+   --------------------------
+   
+   -- sets the ehh interface to RMII
+   -- this must be done before Init_Pins
+   procedure Set_Eth_Interface
+   is
+      PMC_Tmp      : Scfg.PMC_Register   := R.Syscfg.PMC;
+   begin
+      -- before all else select the eth media interface
+      -- reduced interface on Olimex
+      PMC_Tmp.MII_RMII_SEL    := Scfg.RMII;
+      -- write to hardware
+      R.Syscfg.PMC            := PMC_Tmp;
+   end Set_Eth_Interface;
+
+   -- starts the ethernet clock
+   -- and resets the MAC
+   procedure Init_Eth_Clock
+   is
+      Ahb1en_Tmp   : Rcc.AHB1EN_Register  := R.Rcc.AHB1ENR;
+   begin
+       Ahb1en_Tmp.ETHMAC    := Rcc.Enable;  -- mac clock
+       Ahb1en_Tmp.ETHMACRX  := Rcc.Enable;  -- receive clock
+       Ahb1en_Tmp.ETHMACTX  := Rcc.Enable;  -- transmit clock
+       R.Rcc.AHB1ENR        := Ahb1en_Tmp;
+       
+       -- reset the ethernet mac
+       declare
+	  Ahb1rst_Tmp  : Rcc.AHB1RST_Register := R.Rcc.AHB1RSTR;
+       begin
+	  Ahb1rst_Tmp.ETHMAC   := Rcc.Off;
+	  R.Rcc.AHB1RSTR       := Ahb1rst_Tmp;
+	  
+	  Ahb1rst_Tmp.ETHMAC   := Rcc.Reset;
+	  R.Rcc.AHB1RSTR       := Ahb1rst_Tmp;
+	  
+	  Ahb1rst_Tmp.ETHMAC   := Rcc.Off;
+	  R.Rcc.AHB1RSTR       := Ahb1rst_Tmp;
+       end;
+   end Init_Eth_Clock;
+   
+      
+   -- resets all MAC subsystem internal registers and logic
+   -- After reset all the registers holds their respective reset values
+   procedure Soft_Reset
+   is
+      use type Stm.Bits_1;
+      Dmabmr_Tmp : Eth.DMABMR_Register := R.Eth_Mac.DMABMR;
+   begin
+      Dmabmr_Tmp.SR := Eth.Reset;
+      R.Eth_Mac.DMABMR := Dmabmr_Tmp;
+      while Dmabmr_Tmp.SR /= Eth.Off loop
+	 Dmabmr_Tmp := R.Eth_Mac.DMABMR;
+      end loop;
+   end Soft_Reset;
+   
+   
    ------------------------------
    --  for initialization  of  --
    -- the finite state machine --
@@ -723,9 +768,6 @@ package body Finrod.Net.Eth is
 	 when Eth_Init_Buffers      =>
 	    Init_Frame_Store;
 	    Init_Buffers;
-	    Fsm_State := Eth_Dma_Reset;
-	 when Eth_Dma_Reset         =>
-	    Dma_Reset;
 	    Fsm_State := Eth_Set_Addresses;
 	 when Eth_Set_Addresses     =>
 	    Set_Dma_Busmode;
@@ -758,7 +800,9 @@ package body Finrod.Net.Eth is
    is (Fsm_State);
    
    
-   -- starts the ETH initialization procedure from a soft reset.
+   -- starts the ETH initialization procedure from Eth_Init_Buffers.
+   --  (a soft reset was done already before initing the PTP timer)
+   --  (so when a soft reset is required also the PTP timer must be restarted)
    -- the PHY's init fsm must have been on the job stack already, since
    -- it takes about half a sec to complete.
    -- once finished the fsm will disappear from the jobstack and 
@@ -767,6 +811,7 @@ package body Finrod.Net.Eth is
    procedure Reset
    is
    begin
+      -- Soft_Reset;
       Fsm_State := Eth_Init_Buffers;
       Thr.Insert_Job (Fsm'Access);
    end Reset;
@@ -780,6 +825,7 @@ package body Finrod.Net.Eth is
    is
    begin
       if Fsm_State = Eth_Ready_To_Start then
+	 Fsm_State := Eth_Starting;
 	 Thr.Insert_Job (Fsm'Access);
       end if;
    end Eth_Start;

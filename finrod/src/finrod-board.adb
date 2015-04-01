@@ -36,13 +36,9 @@ pragma Warnings (Off, "*(No_Exception_Propagation) in effect");
 
 with Ada.Unchecked_Conversion;
 
-with STM32F4.O7xx.Syscfg;
 with STM32F4.O7xx.Registers;
 with STM32F4.O7xx.Rcc;
 with STM32F4.Gpio;
-
-with Finrod.Sermon;
---with Finrod.Net.Eth;
 
 package body Finrod.Board is
    
@@ -50,7 +46,6 @@ package body Finrod.Board is
    package Gpio renames STM32F4.Gpio;
    package R    renames STM32F4.O7xx.Registers;
    package Rcc  renames STM32F4.O7xx.Rcc;
-   package Scfg renames STM32F4.O7xx.Syscfg;
   
    --------------------------------
    -- constants,                 --
@@ -97,7 +92,33 @@ package body Finrod.Board is
   --     --Sermon.Init_Usart3;--------------------------------------------
   --  end Init_Pins_Olimex;
   --   pragma Unreferenced (Init_Pins_Olimex);
+   
+   
+       
+   --  RCC enable registers for some blocks
+   --  ethernet is not in this routine, it needs to be started later
+   procedure Init_Clocks
+     is
+      Ahb1en_Tmp   : Rcc.AHB1EN_Register  := R.Rcc.AHB1ENR;
+      Apb2en_Tmp   : Rcc.APB2EN_Register  := R.Rcc.APB2ENR;
+   begin
+      -- start the syscfg block
+      Apb2en_Tmp.Syscfg    := Rcc.Enable;
+      R.Rcc.APB2ENR        := Apb2en_Tmp;
+      
+      -- start uart
+      Ahb1en_Tmp.Gpiob     := Rcc.Enable;  -- for uart1 pins
+      Ahb1en_Tmp.Dma2      := Rcc.Enable;  -- for uart1 dma
+      
+      -- then ethernet pins
+      Ahb1en_Tmp.GPIOA     := Rcc.Enable;  -- for eth_rmii interface pins
+      Ahb1en_Tmp.GPIOB     := Rcc.Enable;  -- 
+      Ahb1en_Tmp.GPIOC     := Rcc.Enable;  -- for eth_rmii interface pins
+      Ahb1en_Tmp.GPIOG     := Rcc.Enable;  -- for eth_rmii interface pins
+      R.Rcc.AHB1ENR        := Ahb1en_Tmp;
+   end Init_Clocks;
   
+
   -- inits the pins and then calls any other init functions --
   -- that might be needed                                   --
    procedure Init_Pins
@@ -113,7 +134,7 @@ package body Finrod.Board is
 	 --Apb1rst_Tmp  : Rcc.APB1RST_Register := R.Rcc.APB1RSTR;
 	 Apb2rst_Tmp  : Rcc.APB2RST_Register := R.Rcc.APB2RSTR;
       begin
-	 Ahb1rst_Tmp.ETHMAC   := Rcc.Off; -- pulse it, according to cube
+	 --Ahb1rst_Tmp.ETHMAC   := Rcc.Off; -- pulse it, according to cube
 	 Ahb1rst_Tmp.DMA1     := Rcc.Off;
 	 Ahb1rst_Tmp.DMA2     := Rcc.Off;
 	 Ahb1rst_Tmp.GPIOA    := Rcc.Off;
@@ -125,7 +146,7 @@ package body Finrod.Board is
 	 Apb2rst_Tmp.Uart6    := Rcc.Off;
 	 R.Rcc.APB2RSTR       := Apb2rst_Tmp;
 	 
-	 Ahb1rst_Tmp.ETHMAC   := Rcc.Reset;
+	 --Ahb1rst_Tmp.ETHMAC   := Rcc.Reset;
 	 Ahb1rst_Tmp.DMA1     := Rcc.Reset;
 	 Ahb1rst_Tmp.DMA2     := Rcc.Reset;
 	 Ahb1rst_Tmp.GPIOA    := Rcc.Reset;
@@ -153,44 +174,6 @@ package body Finrod.Board is
 	 R.Rcc.APB2RSTR       := Apb2rst_Tmp;
       end;
       
-      --  Syscfg registers
-      declare
-	 PMC_Tmp      : Scfg.PMC_Register   := R.Syscfg.PMC;
-      begin
-	 -- before all else select the eth media interface
-	 -- reduced interface on Olimex
-	 PMC_Tmp.MII_RMII_SEL    := Scfg.RMII;
-	 -- write to hardware
-	 R.Syscfg.PMC            := PMC_Tmp;
-      end;
-      
-      --  RCC enable registers
-      declare
-	 Ahb1en_Tmp   : Rcc.AHB1EN_Register  := R.Rcc.AHB1ENR;
-	 Apb2en_Tmp   : Rcc.APB2EN_Register  := R.Rcc.APB2ENR;
-      begin
-	 ---------------------------------
-	 -- start some clocks.
-	 -- uart first
-	 Ahb1en_Tmp.Gpiob     := Rcc.Enable;  -- for uart1 pins
-	 Ahb1en_Tmp.Dma2      := Rcc.Enable;  -- for uart1 dma
-	 -- then ethernet
-	 Ahb1en_Tmp.GPIOA     := Rcc.Enable;  -- for eth_rmii interface pins
-	 Ahb1en_Tmp.GPIOB     := Rcc.Enable;  -- 
-	 Ahb1en_Tmp.GPIOC     := Rcc.Enable;  -- for eth_rmii interface pins
-	 Ahb1en_Tmp.GPIOG     := Rcc.Enable;  -- for eth_rmii interface pins
-	 Ahb1en_Tmp.ETHMAC    := Rcc.Enable;  -- mac clock
-	 Ahb1en_Tmp.ETHMACRX  := Rcc.Enable;  -- receive clock
-	 Ahb1en_Tmp.ETHMACTX  := Rcc.Enable;  -- transmit clock
-	 -- and I am sure we need this
-	 Ahb1en_Tmp.ETHMACPTP := Rcc.Enable;  -- the ptp clock
-	 -- enable uart1 -- this is the discovery animal we use uart6
-	 -- Apb2en_Tmp.Uart1     := Rcc.Enable;
-	 Apb2en_Tmp.Uart6     := Rcc.Enable;
-	 -- write to hardware
-	 R.Rcc.AHB1ENR        := Ahb1en_Tmp;
-	 R.Rcc.APB2ENR        := Apb2en_Tmp;
-      end;
       
       --  GPIOA registers
       declare
@@ -292,7 +275,7 @@ package body Finrod.Board is
       	 cOspeedr_Tmp (6 .. 7) := (others => Gpio.Speed_50MHz);
       	 cOtyper_Tmp (6 .. 7)  := (others => Gpio.Push_Pull);
       	 cPupdr_Tmp (6 .. 7)   := (others => Gpio.Pull_Up);
-      	 cAfrl_Tmp (6 .. 7)    := (others => Gpio.Af7);
+      	 cAfrl_Tmp (6 .. 7)    := (others => Gpio.Af8);
 	 ----------------------------------------------
 	 -- set up the LED on PC13
 	 cModer_Tmp (13)       := Gpio.Output;
@@ -358,11 +341,24 @@ package body Finrod.Board is
 	 --R.GPIOg.Afrl          := GAfrl_Tmp;
 	 R.GPIOg.Afrh          := GAfrh_Tmp;
       end;
-      ----------------------------------------
-      -- init the usart and its dma, so we have a terminal
-      Finrod.Sermon.Init_Usart6;
-      --,init the ethernet with dma and ptp
-      -- not here !! Finrod.Net.Eth.Init_Ethernet;
+      
+      --  RCC enable registers for the auxiliaries
+      declare
+	 Ahb1en_Tmp   : Rcc.AHB1EN_Register  := R.Rcc.AHB1ENR;
+	 Apb2en_Tmp   : Rcc.APB2EN_Register  := R.Rcc.APB2ENR;
+      begin
+	 --Ahb1en_Tmp.ETHMAC    := Rcc.Enable;  -- mac clock
+	 --Ahb1en_Tmp.ETHMACRX  := Rcc.Enable;  -- receive clock
+	 --Ahb1en_Tmp.ETHMACTX  := Rcc.Enable;  -- transmit clock
+	 -- and I am sure we need this
+	 Ahb1en_Tmp.ETHMACPTP := Rcc.Enable;  -- the ptp clock
+	 -- enable uart1 -- this is the discovery animal we use uart6
+	 -- Apb2en_Tmp.Uart1     := Rcc.Enable;
+	 Apb2en_Tmp.Uart6     := Rcc.Enable;
+	 -- write to hardware
+	 R.Rcc.AHB1ENR        := Ahb1en_Tmp;
+	 R.Rcc.APB2ENR        := Apb2en_Tmp;
+      end;
    end Init_Pins;
    
   

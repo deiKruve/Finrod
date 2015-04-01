@@ -41,6 +41,7 @@ with Finrod.Sermon;
 with Finrod.Thread;
 with Finrod.Timer;
 with Finrod.Net.Arp;
+with Finrod.Log;
 with Finrod.Last_Chance_Handler;
 
 package body Finrod.Spy is
@@ -52,6 +53,7 @@ package body Finrod.Spy is
    package Timer renames Finrod.Timer;
    package Net   renames Finrod.Net;
    package Arp   renames Finrod.Net.Arp;
+   package Log   renames Finrod.Log;
    
    
    --------------------------------
@@ -84,7 +86,7 @@ package body Finrod.Spy is
 	       Error_Counter := Error_Counter + 8;
 	       return;
 	    end if;
-	    if V24.Dma2_Error then--------------------------------discovery
+	    if V24.Dma2_Error then
 	       V24.Init_Usart6;
 	       Error_Counter := Error_Counter + 8;
 	       return;
@@ -109,7 +111,15 @@ package body Finrod.Spy is
 	    
 	 when Spy_Wait_For_Receiver_Empty =>
 	    if V24.Transmitter_Is_Empty then
-	       Fsm_State := Spy_Try_Parse_Rsttimer;
+	       Fsm_State := Spy_Try_Parse_Lslog;
+	    end if;
+	    
+	 when Spy_Try_Parse_Lslog         =>
+	    if V24.Serial_Recd_Data_A.all (First .. First + 4) = 
+	      "lslog" then
+	       Log.Print_Log;
+	       Fsm_State := Spy_Rebase_Incoming;
+	    else Fsm_State := Spy_Try_Parse_Rsttimer;
 	    end if;
 	    
 	 when Spy_Try_Parse_Rsttimer      =>

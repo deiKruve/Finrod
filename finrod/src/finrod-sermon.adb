@@ -124,6 +124,10 @@ package body Finrod.Sermon is
    function Receiver_Is_Full return Boolean
    is
       use type stm32f4.Bits_16;
+      Dr_Tmp    : constant Uart.Dr_Register   := R.Usart6.Dr; ---------testing
+      Pragma unreferenced (Dr_Tmp);
+      Sr_Tmp    : constant Uart.Sr_Register   := R.Usart6.Sr;
+      Pragma unreferenced (Sr_Tmp);------------------------------------testing
       Ndtr_Tmp  : constant Dma.Ndtr_Register  := R.Dma2.S2.NDTR;
       Srr_Idx   : Srr_Buf_P_Type := Srr_Buf_Lastread mod Srr_Buf_Size + 1;
       -- between 1 and 256

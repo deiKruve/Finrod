@@ -140,9 +140,20 @@ package Finrod.Net.Eth is
    --  for initialization  --
    --------------------------
    
+   procedure Set_Eth_Interface;
+   -- sets the ehh interface to RMII
+   -- this must be done before Init_Pins
+   
+   procedure Init_Eth_Clock;
+   -- starts the ethernet clock
+   -- and resets the MAC
+   
+   procedure Soft_Reset;
+   -- resets all MAC subsystem internal registers and logic
+   -- After reset all the registers holds their respective reset values
+   
    type State_Selector_Type is (Eth_Idle,
 				Eth_Init_buffers,
-				Eth_Dma_Reset,
 				Eth_Set_Addresses,
 				Eth_Init_Frame_Filter,
 				Eth_Init_Maccr,

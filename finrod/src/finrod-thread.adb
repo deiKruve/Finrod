@@ -65,12 +65,14 @@ package body Finrod.Thread is
    ----------------------
    -- public interface --
    ----------------------
-   Job_Entry : Job_Entry_P_Type;
+   --  Job_Entry : Job_Entry_P_Type; -- dont think this is used at the moment
+   -- use for Scan when the scantime gets too long.
+   
    -- add some routine on the stack
    -- for executing after the present load is completed
    procedure Insert_Job (Ds : Job_Proc_P_Type)
    is
-      --Job_Entry : Job_Entry_P_Type;
+      Job_Entry : Job_Entry_P_Type;
    begin
       -- check for reusable structs
       if Free_List /= null then
@@ -91,23 +93,36 @@ package body Finrod.Thread is
    procedure Delete_Job (Ds : Job_Proc_P_Type)
    is 
       use type System.Address;
-      Job_Entry : Job_Entry_P_Type := Job_List;
-      Prev_Job  : Job_Entry_P_Type;
+      Job_Entry : Job_Entry_P_Type := Job_List; -- (is overriding)
+      R         : Job_Entry_P_Type;
    begin
-      while Job_Entry /= null and then Job_Entry.Job /= Ds.all'Address loop
-	 Prev_Job  := Job_Entry;
-	 Job_Entry := Job_Entry.Next;
-      end loop;
-      if Job_Entry /= null then
+      -- obvious
+      if Job_Entry = null then 
+	 null;
+	 
+      -- if its the first one
+      elsif Job_Entry.Job = Ds.all'Address then
 	 -- take it out of the job chain
-	 Prev_Job.Next := Job_Entry.Next;
+	 R         := Job_Entry;
+	 Job_List  := R.Next;
 	 -- and link it into the free chain
-	 --Job_Entry.Job := null; snotallowed! so it MUST be overwritten
-	 Job_Entry.Next := Free_List;
-	 Free_List := Job_Entry;
+	 R.Next    := Free_List;
+	 Free_List := R;
+	 
+      -- else walk the list to find it
       else
-	 null;-----------------------------------error------------------
-	 -- either dont know this job or last job in the queue
+	 while Job_Entry /= null loop
+	    if Job_Entry.Next.Job = Ds.all'Address then
+	       -- take it out of the job chain
+	       R              := Job_Entry.next;
+	       Job_Entry.Next := R.Next;
+	       -- and link it into the free chain
+	       R.Next         := Free_List;
+	       Free_List      := R;
+	       exit; -- when found
+	    end if;
+	    Job_Entry := Job_Entry.Next;
+	 end loop;
       end if;
    end Delete_Job;
    
@@ -118,19 +133,21 @@ package body Finrod.Thread is
       function Toac is new 
 	Ada.Unchecked_Conversion (Source => System.Address,
 				  Target => Job_Proc_P_Type);
-      Job_Entry : Job_Entry_P_Type;
+      Job_Entry      : Job_Entry_P_Type;
+      Next_Job_Entry : Job_Entry_P_Type;
    begin
-      -- maybe we only do one scan at a time so if
-      -- the stack contains fsm's they execute only once per scan
-      --loop
+      --  we only do one scan at a time so if
+      --  the stack contains fsm's they execute only once per scan.
+      --  a job might take itself off the stack so the pointer to the 
+      --  next job is read in advance.
 	 Timer.Start_Timer;---------------------------for testing
 	 Job_Entry    := Job_List;
 	 while Job_Entry /= null loop
+	    Next_Job_Entry := Job_Entry.Next;
 	    Toac (Job_Entry.Job).all;
-	    Job_Entry := Job_Entry.Next;
+	    Job_Entry := Next_Job_Entry;
 	 end loop;
 	 Timer.Stop_Timer;-----------------------------for testing
-      --end loop; -- this hangs when no job;
    end Scan;
    
    

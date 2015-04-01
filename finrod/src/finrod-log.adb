@@ -35,6 +35,7 @@ pragma Warnings (Off, "*(No_Exception_Propagation) in effect");
 --with STM32F4;
 with Finrod.Timer;
 with Finrod.Sermon;
+with Finrod.Thread;
 
 package body Finrod.Log is
    
@@ -50,7 +51,7 @@ package body Finrod.Log is
       Time_Stamp : Tim.Time_Type;
       Species    : Error_Type;
       S          : String (1 .. 40);
-      Slast      : Positive;
+      Slast      : Positive; --  an indicator for the end of the string
    end record;
    
    type Log_Index_Type is mod 2**5;  -- = 32
@@ -121,22 +122,58 @@ package body Finrod.Log is
       Last_Error := null;
    end Null_Last_Error;
    
+   ------------------------------------
+   -- prints the last 'Log_index_type range' (32 at the moment) log entries
+   -- if there are any.
+   --  procedure Print_Logold
+   --  is
+   --     Index : Log_Index_Type := Log_Index + 1;
+   --  begin
+   --     while Index /= Log_Index loop
+   --  	if Logger (Index).S (Logger (Index).S'First) /= ASCII.NUL then
+   --  	   Sermon.Send_String 
+   --  	   (Timer.Image (Logger (Index).Time_Stamp) & 
+   --  	      Logger (Index).S (Logger (Index).S'First .. Logger (Index).Slast));
+   --  	end if;
+   --  	Index := Index + 1;
+   --     end loop;
+   --  end Print_Logold;
+   
+   ----------------------------
+   
+   R_Indx : Log_Index_Type;
+   
+   -- must be inserted on the job stack, 
+   -- it is a low priotity job!, just like spy is
+   procedure Try_Print_A_Record
+   is
+   begin
+      if Sermon.Transmitter_Is_Empty then
+	 if R_Indx /= Log_Index and 
+	   Logger (R_Indx).S (Logger (R_Indx).S'First) /= ASCII.NUL then
+	    Sermon.Send_String 
+	      (Timer.Image (Logger (R_Indx).Time_Stamp) & 
+		 Logger (R_Indx).S 
+		 (Logger (R_Indx).S'First .. Logger (R_Indx).Slast));
+	    R_Indx := R_Indx + 1; --  It Will Roll Over But Thats ok
+	 else
+	    -- remove yourself
+	    Thread.Delete_Job (Try_Print_A_Record'Access);
+	 end if;
+      end if;
+   end Try_Print_A_Record;
+   
    
    -- prints the last 'Log_index_type range' (32 at the moment) log entries
    -- if there are any.
    procedure Print_Log
    is
-      Index : Log_Index_Type := Log_Index + 1;
    begin
-      while Index /= Log_Index loop
-	if Logger (Index).S (Logger (Index).S'First) /= ASCII.NUL then
-	   Sermon.Send_String 
-	   (Tim.Image (Logger (Index).Time_Stamp) & 
-	      Logger (Index).S (Logger (Index).S'First .. Logger (Index).Slast));
-	end if;
-	Index := Index + 1;
-      end loop;
+      R_Indx := Log_Index + 1;
+      -- insert Try_Print_A_Record (must be more precise later)
+      Thread.Insert_Job (Try_Print_A_Record'Access);
    end Print_Log;
+   
    
    
 begin

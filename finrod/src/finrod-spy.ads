@@ -42,13 +42,15 @@
 --  xarpann                 : make an arp announcement
 --  lsrarp <number 1 .. 9>  : display 'number' received frames
 --  lsxarp <number 1 .. 9>  : display 'number' transmitted frames
---  
+--  lslog                   : displays the log
+--
 
 package Finrod.Spy is
    
    type State_Selector_Type is (Spy_Health_Check,
 				Spy_Is_Receiver_Full,
 				Spy_Wait_For_Receiver_Empty,
+				Spy_Try_Parse_Lslog,
 				Spy_Try_Parse_Rsttimer,
 				Spy_Try_Parse_Rtime,
 				Spy_Try_Parse_Arp_Req,

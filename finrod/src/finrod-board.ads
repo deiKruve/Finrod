@@ -52,6 +52,10 @@ package Finrod.Board is
    subtype Mac_Address is STM32F4.Bits_48;
    subtype Ip_Address  is STM32F4.Bits_32;
    
+   procedure Init_Clocks;
+   --  RCC enable registers for some blocks
+   --  ethernet is not in this routine, it needs to be started later
+   
    procedure Init_Pins;
    -- inits the basic board with serial and eth comms and id pins
    -- it will call any other  resource init functions 
