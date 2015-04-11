@@ -40,6 +40,7 @@ with Finrod.Board;
 with Finrod.Sermon;
 with Finrod.Thread;
 with Finrod.Timer;
+with Finrod.Net.Eth;
 with Finrod.Net.Arp;
 with Finrod.Log;
 with Finrod.Last_Chance_Handler;
@@ -52,6 +53,7 @@ package body Finrod.Spy is
    package Flch  renames Finrod.Last_Chance_Handler;
    package Timer renames Finrod.Timer;
    package Net   renames Finrod.Net;
+   package Eth   renames Finrod.Net.Eth;
    package Arp   renames Finrod.Net.Arp;
    package Log   renames Finrod.Log;
    
@@ -77,6 +79,8 @@ package body Finrod.Spy is
    procedure Fsm
    is
       use type V24.Uart_Data_Type;
+      use type Net.Test_Reply_Type;
+      use type Net.Poll_X_Reply_Type;
       Dummy_Reply : Net.Test_Reply_Type;
    begin
       case Fsm_State is
@@ -135,11 +139,11 @@ package body Finrod.Spy is
 	      "rtime" then
 	       V24.Send_String 
 		 (Timer.Image (Timer.Report_Min_Duration) & 
-		    "   " & 
+		    " min.  " & 
 		    Timer.Image (Timer.Report_Max_Duration) &
-		    " clock ticks.");
+		    " max.");
 	       Fsm_State := Spy_Rebase_Incoming;
-	    else Fsm_State := Spy_Echo_Junk;
+	    else Fsm_State := Spy_Try_Parse_Arp_Req;
 	    end if;
 	    
 	 when Spy_Try_Parse_Arp_Req       =>
@@ -159,12 +163,26 @@ package body Finrod.Spy is
 		 "ann" then
 		  Dummy_Reply := Arp.Send_Arp_Request 
 		    (Arp.Arp_Announce, Board.Get_Ip_Address);
-		  Fsm_State := Spy_Rebase_Incoming;
+		  if Dummy_Reply = Net.Stashed_For_Sending then
+		     Eth.Send_Next;
+		     Fsm_State := Spy_Wait_Eth_Xmit_Complete;
+		  else
+		     Fsm_State := Spy_Rebase_Incoming;
+		  end if;
 	       else 
 		  Fsm_State := Spy_Echo_Junk;
 	       end if;
 	    else
 	       Fsm_State := Spy_Echo_Junk;
+	    end if;
+	    
+	 when Spy_Wait_Eth_Xmit_Complete =>
+	    Eth.Poll_Xmit_Completed;
+	    if Eth.Dix_Done /= Net.Ongoing then
+	       -- either complete or an error
+	       -- throw the error for the moment
+	       -- it will be picked up in the log checker.
+	       Fsm_State := Spy_Rebase_Incoming;
 	    end if;
 	    
 	 when Spy_Try_Parse_Show_Farp     =>

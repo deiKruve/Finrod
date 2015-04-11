@@ -74,7 +74,7 @@ package body Finrod.Sermon is
    S7_Cr_Tmp : Dma.CR_Register;
    
    -- the data to be send is copied into this string
-   Uart_Data_Tobe_Send : aliased String (1 .. 68);
+   Uart_Data_Tobe_Send : aliased String (1 .. Message_Length);
    
    -- received data buffer structure --
    Srr_Buf_Size : constant := 256;

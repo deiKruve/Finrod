@@ -80,7 +80,7 @@ package Finrod.Net is
    type Test_Reply_Type is (Fit,
 			    Stashed_For_Sending,  -- must be processed later
 			    Stashed_For_ArpTable, -- must be processed later
-			    Fits_With_Error,      -- there is a sender and an id!
+			    Fits_With_Error,    -- there is a sender and an id!
 			    No_Fit,
 			    None_Recd,
 			    Fatal_error);

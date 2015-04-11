@@ -75,7 +75,7 @@ package body Finrod.Nmt is
    --  public interface  --
    ------------------------
    
-   
+   Lamp : Boolean := False;
    -- there was no real need for an fsm here but since this is the theme
    -- of the project, it was also build in that shape.
    -- therefor the case discriminator in enclosed in a while loop
@@ -170,6 +170,17 @@ package body Finrod.Nmt is
 	       
 	    when Nmt_Ready                      =>
 	       loop
+		  if not Lamp and then Timer.Done2 then
+		     -- led on
+		     R.GPIOC.Bsrr := R.GPIOC.Bsrr or 2 ** Gpio.Br13;
+		     Timer.Start_Timer3 (1, 0); -- 1 sec
+		     Lamp := True;
+		  elsif Lamp and then Timer.Done3 then
+		     -- led off
+		     R.GPIOC.Bsrr := R.GPIOC.Bsrr or 2 ** Gpio.Bs13;
+		     Timer.Start_Timer2 (1, 0); -- 1 sec
+		     Lamp := False;
+		  end if;
 		  Thr.Scan;
 	       end loop;
 	       --    the following is now dead code

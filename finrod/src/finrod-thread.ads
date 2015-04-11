@@ -73,7 +73,8 @@ package Finrod.Thread is
    
    procedure Delete_Job (Ds : Job_Proc_P_Type);   
    -- delete a job (like in the case of a routine with a loop)
-   
+   -- it will return silently if nothing is found
+
    procedure Scan;
    -- start executing the job stack forever, unless there is no job
    -- but this is not legal, since then the whole system hangs.

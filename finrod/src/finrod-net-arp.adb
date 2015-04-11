@@ -70,6 +70,8 @@ package body Finrod.Net.Arp is
    package Arp_Table renames Finrod.Net.Arptable;
    package Eth       renames Finrod.Net.Eth;
    package V24       renames Finrod.Sermon;
+   
+   
    --------------------------------
    -- constants,                 --
    -- definitions and local vars --
@@ -90,6 +92,11 @@ package body Finrod.Net.Arp is
       Spa     : Stm.Bits_32; -- sender i/f ip address
       Tha     : Stm.Bits_48; -- target i/f mac address
       Tpa     : Stm.Bits_32; -- tatget i/f ip address
+      Padd    : Stm.Bits_16; -- padding to make 64 byte frame
+      Padd1   : Stm.Bits_32; -- padding to make 64 byte frame
+      Padd2   : Stm.Bits_32; -- padding to make 64 byte frame
+      Padd3   : Stm.Bits_32; -- padding to make 64 byte frame
+      Padd4   : Stm.Bits_32; -- padding to make 64 byte frame
    end record;
    
    for bArp_Packet use record             -- note the start address at byte 4
@@ -105,14 +112,22 @@ package body Finrod.Net.Arp is
       Spa    at 28 range  0 .. 31;
       Tha    at 32 range  0 .. 47;
       Tpa    at 38 range  0 .. 31;
-      -- end before byte 40
-      -- so length = 40 bytes
+      Padd   at 42 range  0 .. 15;
+      Padd1  at 44 range  0 .. 31;
+      Padd2  at 48 range  0 .. 31;
+      Padd3  at 52 range  0 .. 31;
+      Padd4  at 56 range  0 .. 31;
+      
+      -- 38 + 32 / 8 = 42
+      -- so length = 42 bytes, 
+      -- but theoretically this should be paddedto 60 bytes
    end record;
    
    for bArp_Packet'Bit_Order use System.High_Order_First;
    for bArp_Packet'Scalar_Storage_Order use System.High_Order_First;
    -- its Big Endian
-   BArp_Packet_Length : constant Stm.Bits_13 := 40;
+   BArp_Packet_Length : constant Stm.Bits_13 := 60;
+   -- pragma Unreferenced (BArp_Packet_Length);
    type BArp_Packet_Access_Type is access BArp_Packet;
    
    Display_Rframes : Natural := 0;
@@ -125,9 +140,11 @@ package body Finrod.Net.Arp is
    
    -- build a byte representation of a frame and send it to the v24 interface --
    procedure Show (A : System.Address) is
-      Arr : Sse.Storage_Array (1 .. 28);
+      Arr : Sse.Storage_Array (1 .. 42);
       for Arr'Address use A;
       pragma Import (Ada, Arr);
+      Slen : Integer;
+      pragma Unreferenced (Slen);
    begin
       declare -- hardcoded for speed
 	 S : constant String := 
@@ -145,7 +162,7 @@ package body Finrod.Net.Arp is
 	   Arr (11)'Img & ' ' &
 	   Arr (12)'Img & ' ' & 
 	   Arr (13)'Img & ' ' &
-	   Arr (14)'Img & ' ' & 
+	   Arr (14)'Img & ASCII.CR & ASCII.LF & 
 	   Arr (15)'Img & ' ' &
 	   Arr (16)'Img & ' ' & 
 	   Arr (17)'Img & ' ' & 
@@ -160,8 +177,22 @@ package body Finrod.Net.Arp is
 	   Arr (26)'Img & ' ' &
 	   Arr (27)'Img & ' ' &
 	   Arr (28)'Img & ' ' &
-	   ASCII.LF;
+	   Arr (29)'Img & ' ' &
+	   Arr (30)'Img & ' ' &
+	   Arr (31)'Img & ' ' &
+	   Arr (32)'Img & ' ' &
+	   Arr (33)'Img & ' ' &
+	   Arr (34)'Img & ' ' &
+	   Arr (35)'Img & ' ' &
+	   Arr (36)'Img & ' ' &
+	   Arr (37)'Img & ' ' &
+	   Arr (38)'Img & ' ' &
+	   Arr (39)'Img & ' ' &
+	   Arr (40)'Img & ' ' &
+	   Arr (41)'Img & ' ' &
+	   Arr (42)'Img;
       begin
+	 Slen := S'Length;
 	 V24.Send_String (S);
       end;
    end Show;
@@ -293,8 +324,8 @@ package body Finrod.Net.Arp is
 	    --F.Tha := Mac_null;
       end case;
       Eth.Stash_For_Sending (F.all'Address , BArp_Packet_Length);
+      Show (F.all'Address);
       return Stashed_For_Sending;
-
    end Send_Arp_Request;
    
    

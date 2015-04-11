@@ -501,11 +501,24 @@ package body Finrod.Net.Eth is
    function Tx_Status_Image return String
    is (" DMAsr = " & Stm.Bits_32'Image (Error_Dmasr) & 
 	 " Tdes0 = " & Stm.Bits_32'Image (Error_Tdes0));
+   -- Tdes0.ec trips when no cable (too many collisions)
+   --
+   -- DMAsr.tps = 6 Suspended; 
+   --             Transmit descriptor unavailable or transmit buffer underflow
+   -- DMAsr.tbus = 1 Transmit buffer unavailable status, (cause next one is mt?)
    
    
    -- poll for a received frame and determine the type.
-   -- stash any split 2nd halves
-   function Rx_Poll return Poll_R_Reply_Type
+   -- if the answer in 'Rx_Recvd' is yes the received frame details are in
+   --  Recvd_Frame_P : Frame_Address_Type; 
+   --  Recvd_Frame_L : Frame_Length_Type;
+   ---
+   -- can be posted in the job thread   
+   -- in that case it removes itself on error and when a rx-frame is found.
+   -- in order not to overwrite the received frame address in the case of
+   -- a new received frame.
+   -- so it must be reinserted after the details have been processed.
+   procedure Rx_Poll
    is
       use type Stm.Bits_1;
       function Des0Tob is new
@@ -519,37 +532,189 @@ package body Finrod.Net.Eth is
       if Dmasr_Tmp.Ais = Eth.Tripped then
 	 Error_Dmasr  := DmasrTob (Dmasr_Tmp); -- for later analysis
 	 Log.Log_Error (Log.Eth_Error_Rcve, DMA_Status_Image);
-	 return Error_Fatal; -- until we know better.
-      end if;
-      
-      if Dmasr_Tmp.Rs = Eth.F_Recd then
+	 Rx_Recvd     := Error_Fatal; -- until we know better.
+	 -- remove yrself out of the thread
+	 Thr.Delete_Job (Rx_Poll'Access);
+	 
+      elsif Dmasr_Tmp.Rs = Eth.F_Recd then
 	 for I in Rx_Desc_Idx_Type'Range loop
 	    if Rx_Desc (I).Rdes0.Own = Ebuf.Me then -- got a frame
 	       if Rx_Desc (I).Rdes0.Es = Ebuf.Tripped then -- but is it faulty?
 		  Error_Rdes0  := des0tob (Rx_Desc (I).Rdes0);
 		  Log.Log_Error (Log.Eth_Error_Rcve, Rx_Status_Image);
-		  return Error_Fatal; -- until we know better.
+		  Rx_Recvd     := Error_Fatal; -- until we know better.
 	       else
-		  return Yes;
+		  Rx_Recvd     := Yes;
 	       end if;
+	       -- remove yrself out of the thread
+	       Thr.Delete_Job (Rx_Poll'Access);
+	       return;
 	    end if;
 	 end loop;
 	 Log.Log_Error (Log.Eth_Error_Rcve, "no own buffer found.");
-	 return Error_Fatal; -- until we know better.
+	 Rx_Recvd     := Error_Fatal; -- until we know better.
+	 -- remove yrself out of the thread
+	 Thr.Delete_Job (Rx_Poll'Access);
 	 
       else
-	 return No;
+	 Rx_Recvd     := No;
       end if;
    end Rx_Poll;
    
    
+   -------------------------------
+   -- for the parent and        --  
+   -- uncles only               --
+   -------------------------------
+   
+   -- to send a frame build it first then pass the address and the length
+   -- here for transmission.
+   -- the frame can ony be released once it has been successfully sent.
+   -- 
+   -- the function returns false when 
+   -- the next descriptor in the array is still in use. 
+   -- If this were to happen the eth net quality is most likely very poor, 
+   -- since there are buffers waiting to be transmitted.
+   -- use Poll_Xmit_Completed after this command to ascertain its gone.
+   procedure Send_Frame (Ba  : in Frame_Address_Type; 
+			Bbc : in Frame_Length_Type)
+   is
+      use type Stm.Bits_1;
+      Tdes0_Tmp : Ebuf.Tdes0_Type := Tx_Desc (Tx_Desc_Idx).Tdes0;
+   begin
+      if Tdes0_Tmp.Own = Ebuf.Me then
+	 Tdes0_Tmp.Ls                      := Ebuf.Tru; --!!!!!!!
+	 Tdes0_Tmp.Fs                      := Ebuf.Tru; --!!!!!!!
+	 Tdes0_Tmp.Ttse                    := Ebuf.Enable; -- timestamp enable
+	 Tdes0_Tmp.Cic                     := Ebuf.Ck_Head_Payload; -- checksum
+	 Tx_Desc (Tx_Desc_Idx).Tdes0       := Tdes0_Tmp;
+	 Tx_Desc (Tx_Desc_Idx).Tdes1.Tbs1  := Bbc;
+	 Tx_Desc (Tx_Desc_Idx).Tdes2.Tbap1_Ttsl  := Tob (Ba);
+	 Tdes0_Tmp.Own                     := Ebuf.Dma; -- control to DMA
+	 Tx_Desc (Tx_Desc_Idx).Tdes0       := Tdes0_Tmp;
+	 
+	 -- and start transmission
+	 R.Eth_Mac.DMATDLAR := Tob (Tx_Desc (Tx_Desc_Idx)'Address);
+	 declare 
+	    Dmaomr_Tmp : Eth.DMAOMR_Register := R.Eth_Mac.Dmaomr;
+	 begin
+	    Dmaomr_Tmp.ST    := Eth.Start;
+	    R.Eth_Mac.Dmaomr := Dmaomr_Tmp;
+	 end;
+	 Dix             := Tx_Desc_Idx;       -- for return to app for polling
+	 Tx_Desc_Idx     := Tx_Desc_Idx + 1;   -- assume it is empty
+	 
+	 Dix_Done        := Ongoing;           -- it is being xmitted
+      else
+	 Log.Log_Error 
+	   (Log.Eth_Error_Xmit, "ethernet sits too long on buffers");
+	 Dix_Done        := Error_Fatal;
+      end if;
+   end Send_Frame;
+   
+   
+   -- queues a frame for sending,
+   -- it is meant as a stage2 repost action, which can be executed just now
+   procedure Stash_For_Sending (Ba  : Frame_Address_Type; 
+				Bbc : Frame_Length_Type)
+   is
+      Stash : Stashed_P_Type;
+      St    : Stashed_P_Type;
+      
+   begin
+      if Mt_Stash_Root /= null then
+	 Stash         := Mt_Stash_Root;
+	 Mt_Stash_Root := Mt_Stash_Root.Next;
+      else
+	 Stash         := new Stashed_Type;
+      end if;
+      
+      Stash.Frame_Addr := Ba;
+      Stash.Frame_Len  := Bbc;
+      
+      -- add at the end of the list
+      Stash.Next       := null;
+      
+      if Stash_Root = null then
+	 Stash_Root    := Stash;
+	 
+      else
+	 St            := Stash_Root;
+	 while St.next /= null loop
+	    St         := St.Next;
+	 end loop;
+	 
+	 St.Next       := Stash;
+      end if;
+   end Stash_For_Sending;
+   
+   
+   -- sends the next queued item. 
+   -- gets the next tx_descriptor and fits the frame into it.
+   -- then send through DMA to the mac and transmits.
+   --
+   -- note that normally there should be no more than 1 item on the stack.
+   -- so this command should happen after Stash_For_Sending without any
+   -- ethernet send activity in between.
+   -- the function returns false when 
+   -- the next descriptor in the array is still in use. 
+   -- If this were to happen the eth net quality is most likely very poor, 
+   -- since there are buffers waiting to be transmitted.
+   -- use Poll_Xmit_Completed after this command to ascertain its gone.
+   ---
+   -- can be posted in the job thread
+   procedure Send_Next
+   is
+      use type Stm.Bits_1;
+      Stash : constant Stashed_P_Type    := Stash_Root;
+      St    : Stashed_P_Type;
+   begin
+      if Tx_Desc (Tx_Desc_Idx).Tdes0.Own = Ebuf.Me then
+	 Tx_Desc (Tx_Desc_Idx).Tdes1.Tbs1       := Stash.Frame_Len;
+	 Tx_Desc (Tx_Desc_Idx).Tdes2.Tbap1_Ttsl := Tob (Stash.Frame_Addr);
+	 Tx_Desc (Tx_Desc_Idx).Tdes0.Own        := Ebuf.Dma; -- control to DMA
+	 
+	 -- and start transmission
+	 R.Eth_Mac.DMATDLAR  := Tob (Tx_Desc (Tx_Desc_Idx)'Address);
+	 declare 
+	    Dmaomr_Tmp : Eth.DMAOMR_Register := R.Eth_Mac.Dmaomr;
+	 begin
+	    Dmaomr_Tmp.ST    := Eth.Start;
+	    R.Eth_Mac.Dmaomr := Dmaomr_Tmp;
+	 end;
+	 
+	 if Stash_Root = Stash then
+	    St              := Stash_Root;         -- out of the chain and
+	    Stash_Root      := St.Next;
+	    St.Next         := Mt_Stash_Root;      -- into the empty chain
+	    Mt_Stash_Root   := St;
+	    
+	 else
+	     Log.Log_Error 
+	       (Log.Eth_Error_Xmit, "programming error");
+	     Dix_Done        := Error_Fatal;
+	 end if;
+	 
+	 Dix             := Tx_Desc_Idx;        -- for return to app
+	 Tx_Desc_Idx     := Tx_Desc_Idx + 1;    -- assume it is empty
+	 
+	 Dix_Done        := Ongoing;              -- it is being xmitted
+      else
+	 Log.Log_Error 
+	   (Log.Eth_Error_Xmit, "ethernet sits too long on buffers");
+	 Dix_Done        := Error_Fatal;
+      end if;
+      Thr.Delete_Job (Send_Next'Access);
+   end Send_Next;
+   
+    
    -- since we have a strictly sequential comms pattern we
    -- check for completed or error.
    -- in case of error, normally there is a re-transmission 
    -- after the error has been cleared.
-   function Poll_Xmit_Completed (Dix  : in  Tx_Desc_Idx_Type;
-				 Time : out Timer.Time_type) 
-				return Poll_X_Reply_Type
+   ---
+   -- can be posted in the job thread
+   procedure Poll_Xmit_Completed
    is
       use type Stm.Bits_1;
       function Des0Tob is new
@@ -565,12 +730,13 @@ package body Finrod.Net.Eth is
 	 Error_Dmasr  := DmasrTob (Dmasr_Tmp); -- for later analysis
 	 Error_Tdes0  := des0tob (Tdes0_Tmp);
 	 Log.Log_Error (Log.Eth_Error_Xmit, Tx_Status_Image);
-	 return Error_Fatal; -- until we know better
-      end if;
-      
-      if Tdes0_Tmp.Own = Ebuf.Dma then
-	 return Ongoing;
+	 Dix_Done     := Error_Retry;
+	 -- remove yrself here
+	 Thr.Delete_Job (Poll_Xmit_Completed'Access);
 	 
+      elsif Tdes0_Tmp.Own = Ebuf.Dma then
+	 Dix_Done     := Ongoing;
+	   
       else
 	 declare
 	    subtype Tdec3_Time_Type is Ebuf.Tdes3_Type;
@@ -579,119 +745,15 @@ package body Finrod.Net.Eth is
 	    Time.Seconds := Tdec3_Time_Type (Tx_Desc (Dix).Tdes3).Tbap2_Ttsh;
 	    Time.Subsecs := Tdec2_Time_Type (Tx_Desc (Dix).Tdes2).Tbap1_Ttsl;
 	 end;
-	 -- return the buffer
+	 Dix_Done := Complete;
+	 -- return the buffer for reuse
 	 Mark_Free (Toa (Tx_Desc (Dix).Tdes3.Tbap2_Ttsh));
-	 return Complete;
+	 -- remove yrself here
+	 Thr.Delete_Job (Poll_Xmit_Completed'Access);
       end if;
    end Poll_Xmit_Completed;
    
-   
-   -- queues a frame for sending,
-   -- it is meant as a stage2 repost action, which can be executed just now
-   procedure Stash_For_Sending (Ba : Frame_Address_Type; Bbc : Frame_Length_Type)
-   is
-      Stash : Stashed_P_Type;
-   begin
-      if Mt_Stash_Root /= null then
-	 Stash := Mt_Stash_Root;
-	 Mt_Stash_Root := Mt_Stash_Root.Next;
-      else
-	 Stash := new Stashed_Type;
-      end if;
-      Stash.Frame_Addr := Ba;
-      Stash.Frame_Len  := Bbc;
-      Stash.Next       := Stash_Root;
-      Stash_Root       := Stash;
-   end Stash_For_Sending;
-   
-   
-   -- sends the next queued item. note that normally there should be
-   -- no more than 1 item on the stack.
-   -- so this command should happen after Stash_For_Sending without any
-   -- ethernet send activity in between.
-   -- the function returns false when 
-   -- the next descriptor in the array is still in use. 
-   -- If this were to happen the eth net quality is most likely very poor, since
-   -- there are buffers waiting to be transmitted.
-   -- use Poll_Xmit_Completed after this command to ascertain its gone.
-   function Send_Next (Dix : out Tx_Desc_Idx_Type)
-		      return boolean
-   is
-      use type Stm.Bits_1;
-      Stash : constant Stashed_P_Type    := Stash_Root;
-   begin
-      if Tx_Desc (Tx_Desc_Idx).Tdes0.Own = Ebuf.Me then
-	 Tx_Desc (Tx_Desc_Idx).Tdes1.Tbs1   := Stash.Frame_Len;
-	 Tx_Desc (Tx_Desc_Idx).Tdes2.Tbap1_Ttsl  := Tob (Stash.Frame_Addr);
-	 Tx_Desc (Tx_Desc_Idx).Tdes0.Own    := Ebuf.Dma; -- control to DMA
-	 
-	 -- and start transmission
-	 R.Eth_Mac.DMATDLAR := Tob (Tx_Desc (Tx_Desc_Idx)'Address);
-	 declare 
-	    Dmaomr_Tmp : Eth.DMAOMR_Register := R.Eth_Mac.Dmaomr;
-	 begin
-	    Dmaomr_Tmp.ST    := Eth.Start;
-	    R.Eth_Mac.Dmaomr := Dmaomr_Tmp;
-	 end;
-	 
-	 Stash_Root.Next := Stash.Next;         -- out of the chain and
-	 Stash.Next      := Mt_Stash_Root.Next; -- into the empty chain
-	 Mt_Stash_Root   := Stash;
-	 
-	 Dix             := Tx_Desc_Idx;        -- for return to app
-	 Tx_Desc_Idx     := Tx_Desc_Idx + 1;    -- assume it is empty
-	 return True;
-      else
-	 Log.Log_Error (Log.Eth_Error_Xmit, "ethernet sits too long on buffers");
-	 return False; -- here is an error, ethernet sits too long on buffers
-      end if;
-   end Send_Next;
-   
-   
-   -- to send a frame build it first then pass the address and the length
-   -- here for transmission.
-   -- the frame can ony be released once it has been successfully sent.
-   -- 
-   -- the function returns false when 
-   -- the next descriptor in the array is still in use. 
-   -- If this were to happen the eth net quality is most likely very poor, since
-   -- there are buffers waiting to be transmitted.
-   -- use Poll_Xmit_Completed after this command to ascertain its gone.
-   function Send_Frame (Ba  : in Frame_Address_Type; 
-			Bbc : in Frame_Length_Type;
-			Dix : out Tx_Desc_Idx_Type) return boolean
-   is
-      use type Stm.Bits_1;
-      Tdes0_Tmp : Ebuf.Tdes0_Type := Tx_Desc (Tx_Desc_Idx).Tdes0;
-   begin
-      if Tdes0_Tmp.Own = Ebuf.Me then
-	 Tdes0_Tmp.Ls                       := Ebuf.Tru; --!!!!!!!
-	 Tdes0_Tmp.Fs                       := Ebuf.Tru; --!!!!!!!
-	 Tdes0_Tmp.Ttse                     := Ebuf.Enable; -- timestamp enable
-	 Tdes0_Tmp.Cic                      := Ebuf.Ck_Head_Payload; -- checksum
-	 Tx_Desc (Tx_Desc_Idx).Tdes0        := Tdes0_Tmp;
-	 Tx_Desc (Tx_Desc_Idx).Tdes1.Tbs1   := Bbc;
-	 Tx_Desc (Tx_Desc_Idx).Tdes2.Tbap1_Ttsl  := Tob (Ba);
-	 Tdes0_Tmp.Own                      := Ebuf.Dma; -- control to DMA
-	 Tx_Desc (Tx_Desc_Idx).Tdes0        := Tdes0_Tmp;
-	 
-	 -- and start transmission
-	 R.Eth_Mac.DMATDLAR := Tob (Tx_Desc (Tx_Desc_Idx)'Address);
-	 declare 
-	    Dmaomr_Tmp : Eth.DMAOMR_Register := R.Eth_Mac.Dmaomr;
-	 begin
-	    Dmaomr_Tmp.ST    := Eth.Start;
-	    R.Eth_Mac.Dmaomr := Dmaomr_Tmp;
-	 end;
-	 Dix             := Tx_Desc_Idx;        -- for return to app
-	 Tx_Desc_Idx     := Tx_Desc_Idx + 1;    -- assume it is empty
-	 return True;
-      else
-	 Log.Log_Error (Log.Eth_Error_Xmit, "ethernet sits too long on buffers");
-	 return False; -- here is an error, ethernet sits too long on buffers
-      end if;
-   end Send_Frame;
-   
+  
    
    --------------------------
    --  for initialization  --

@@ -65,7 +65,7 @@ package body Finrod.Timer is
       use type Stm.Bits_32;
       D : constant Time_Type := Left - Right;
    begin
-      if D.Seconds > 2**31 then -- since we dont measure years (the msb is set)
+      if D.Seconds >= 2**31 then -- since we dont measure years (the msb is set)
 	 return True;
       else return False;
       end if;
@@ -76,7 +76,7 @@ package body Finrod.Timer is
       use type Stm.Bits_32;
       D : constant Time_Type := Right - Left;
    begin
-      if D.Seconds > 2**31 then -- since we dont measure years (the msb is set)
+      if D.Seconds >= 2**31 then -- since we dont measure years (the msb is set)
 	 return True;
       else return False;
       end if;
@@ -86,10 +86,8 @@ package body Finrod.Timer is
    function Image (T : Time_Type) return String
    is
       S : constant String := 
-	--Unsigned.Image (System.Unsigned_Types.Unsigned (T.Seconds)) & "." & 
-	--Unsigned.Image (System.Unsigned_Types.Unsigned (T.Subsecs));  -- for arm
-	Stm.Bits_32'Image (T.Seconds) & "." & 
-	Stm.Bits_32'Image (T.Subsecs);            -- for dell
+	Stm.Bits_32'Image (T.Seconds) & " s," & 
+	Stm.Bits_32'Image (T.Subsecs) & " ns.";
    begin
       return S;
    end Image;
@@ -288,7 +286,6 @@ package body Finrod.Timer is
       Macimr_Tmp       : Eth.Macimr_Register  := R.Eth_Mac.Macimr;
       Ptpt_Control_Tmp : Eth.PTPTSCR_Register := R.Eth_Mac.PTPTSCR;
       PTP_SSIR_Tmp     : Eth.PTPSSIR_Register := R.Eth_Mac.PTPSSIR;
-      --PTPTSAR_Tmp      : new Eth.PTPTSAR_Register := 3_652_183_076;
       Ptptslur_Tmp     :  Eth.Ptptslur_Register;
    begin
       
@@ -298,59 +295,34 @@ package body Finrod.Timer is
       
       -- enable time stamping
       Ptpt_Control_Tmp.Tse   := Eth.Enabled;
-      --Ptpt_Control_Tmp.TSSSR := Eth.On;  --  999 999 999  roll over
+      Ptpt_Control_Tmp.TSSSR := Eth.On;  --  999 999 999  roll over
       Ptpt_Control_Tmp.TSSIPV4FE := Eth.Enabled;
       Ptpt_Control_Tmp.TSSARFE   := Eth.Enabled;
       --  and some others, wait for later
       Ptpt_Control_Tmp.TSPTPPSV2E := Eth.Enabled;
-      Ptpt_Control_Tmp.Tsaru := Eth.Off; -- for the unfathomable reason this might work
+      -- prepare the updat flag (if needed at all)
+      Ptpt_Control_Tmp.Tsaru := Eth.Off;
       R.Eth_Mac.PTPTSCR      := Ptpt_Control_Tmp; -- write it
-
-      --  for I in 1 .. 10 loop  -- small delay
-      --  	 declare 
-      --        J : Positive := I;
-      --        pragma unreferenced (j);
-      --     begin
-      --        null;
-      --  	 end;
-      --  end loop;
       
       -- set the time increase per tick --
-      -- 10^9/2^31 nsecs / division in the counter
-      -- so for 7 nsecs resolution add (7 * 2^31 / 10^9) per tick (scales to 7)
-      -- but this was for binary roll over!
-      -- for decimal roll-over just make it 7
-      PTP_SSIR_Tmp.Stssi     := 43;  --  15;
+      -- 10^9 - 1 divisions in the counter
+      -- so for 20 nsec resolution the increment must be 20
+      PTP_SSIR_Tmp.Stssi     := 20;
       R.Eth_Mac.PTPSSIR      := PTP_SSIR_Tmp;  -- write it;
-      
+
       -- figute out the update frequency --
-      -- for each tick to be 7 nsecs the update frequency must be: 
-      --    10^9 / 7 = 142_857_143 Hz.
+      -- for each tick to be 20 nsecs the update frequency must be: 
+      --   10^9 / 20 = 50_000_000 Hz
       -- the addent then must be 
-      --    2^32 * 142_857_143 / 168_000_000 = 3_652_183_076
-      R.Eth_Mac.PTPTSAR      := 3_652_183_076; -- write it direct, its 32 bits
+      -- 2^32 * 50_000_000 / 168_000_000 = 1_278_264_076
+      R.Eth_Mac.PTPTSAR      := 1_278_264_076; -- write it direct, its 32 bits
       
       -- update it, and wait for it to be done
       Ptpt_Control_Tmp.Tsaru := Eth.Update;
       R.Eth_Mac.PTPTSCR      := Ptpt_Control_Tmp; -- write it
-      
-      --  for I in 1 .. 10 loop  -- small delay
-      --  	 declare 
-      --        J : Positive := I;
-      --        pragma unreferenced (j);
-      --     begin
-      --        null;
-      --  	 end;
-      --  end loop;
-      
-      --  Ptpt_Control_Tmp.Tsaru := Eth.Off; -- set back to 0-------------------
-      --  R.Eth_Mac.PTPTSCR      := Ptpt_Control_Tmp; -- write it
-
       while Ptpt_Control_Tmp.Tsaru /= Eth.Off loop
 	 Ptpt_Control_Tmp    := R.Eth_Mac.PTPTSCR;
       end loop;
-      
-      --Finrod.Board.Init_Eth_Clock;
       
       -- we want fine mode
       Ptpt_Control_Tmp.Tsfcu := Eth.Fine;
@@ -367,7 +339,4 @@ package body Finrod.Timer is
       R.Eth_Mac.PTPTSCR      := Ptpt_Control_Tmp; -- write it
    end Init;
    
-begin
-   null;
-   --Init;
 end Finrod.Timer;

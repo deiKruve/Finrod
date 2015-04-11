@@ -90,6 +90,7 @@ package body Finrod.Thread is
    
    
    -- delete a job (like in the case of a routine with a loop)
+   -- it will return silently if nothing is found
    procedure Delete_Job (Ds : Job_Proc_P_Type)
    is 
       use type System.Address;
@@ -112,7 +113,8 @@ package body Finrod.Thread is
       -- else walk the list to find it
       else
 	 while Job_Entry /= null loop
-	    if Job_Entry.Next.Job = Ds.all'Address then
+	    if Job_Entry.Next /= null and then 
+	      Job_Entry.Next.Job = Ds.all'Address then
 	       -- take it out of the job chain
 	       R              := Job_Entry.next;
 	       Job_Entry.Next := R.Next;

@@ -73,30 +73,45 @@ package Finrod.Net.Eth is
    function Tx_Status_Image return String with Inline;
    -- returns the 2 status images of the last transmit
    
-   function Rx_Poll return Poll_R_Reply_Type;
+   -- flags for communication between threadable routines:  --
+   Rx_Recvd : Poll_R_Reply_Type;
+   -- holds the return of  'Rx_Poll'.
+   
+   procedure Rx_Poll;
    -- poll for a received frame and determine the type.
-   -- if the answer is yes the received frame details are in
+   -- if the answer in 'Rx_Recvd' is yes the received frame details are in
    --  Recvd_Frame_P : Frame_Address_Type; 
    --  Recvd_Frame_L : Frame_Length_Type;
-   
-   function Poll_Xmit_Completed (Dix : in  Tx_Desc_Idx_Type;
-				Time : out Timer.Time_type)
-				return Poll_X_Reply_Type;
-   -- dix is the index of the descriptor.
-   -- since we have a strictly sequential comms pattern we
-   -- check for completed or error.
-   -- in case of error, normally there is a re-transmission 
-   -- after the error has been cleared.
-   
+   ---
+   -- can be posted in the job thread   
+   -- in that case it removes itself on error and when a rx-frame is found.
+   -- in order not to overwrite the received frame address in the case of
+   -- a new received frame.
+   -- so it must be reinserted after the details have been processed.
+
    
    -------------------------------
    -- for the parent and        --  
    -- uncles only               --
    -------------------------------
+   
+   -- flags for communication between threadable routines:
+   
+   Dix      : Tx_Desc_Idx_Type := 0;
+   -- holds the xmit descriptor index of the last send frame 
+   -- (can be used for polling).
+   
+   Dix_Done : Poll_X_Reply_Type := Complete;
+   -- the last frame was successfully send
+   
+   Time      : Timer.Time_Type;
+   -- timestamp of the last xmitted frame
+   -- for use in syncing
+   
+
     
-   function Send_Frame (Ba  : Frame_Address_Type; 
-			Bbc : Frame_Length_Type;
-			Dix : out Tx_Desc_Idx_Type) return boolean;
+   procedure Send_Frame (Ba  : Frame_Address_Type; 
+			 Bbc : Frame_Length_Type);
    -- to send a frame build it first then pass the address and the length
    -- here for transmission.
    -- the frame can ony be released once it has been successfully sent.
@@ -104,29 +119,47 @@ package Finrod.Net.Eth is
    -- in Dix the descriptor index is returned for polling use.
    -- the function returns false when 
    -- the next descriptor in the array is still in use. 
-   -- If this were to happen the eth net quality is most likely very poor, since
-   -- there are buffers waiting to be transmitted.
+   -- If this were to happen the eth net quality is most likely very poor, 
+   -- since there are buffers waiting to be transmitted.
    -- use Poll_Xmit_Completed after this command to ascertain its gone.
    
    
-   procedure Stash_For_Sending (Ba : Frame_Address_Type; Bbc : Frame_Length_Type);
+   procedure Stash_For_Sending (Ba  : Frame_Address_Type; 
+				Bbc : Frame_Length_Type);
    -- queues a frame for sending,
    -- it is meant as a stage2 repost action, which can be executed just now
+   -- the caller must return status 'Stashed_For_Sending' to its caller
+   -- so that animal may then call 'Send_Next'.
+   -- and then check for completion if needed by calling
+   -- 'Poll_Xmit_Completed'
    
    
-   function Send_Next (Dix : out Tx_Desc_Idx_Type) 
-		      return boolean;
+   procedure Send_Next;
    -- sends the next queued item. 
-   -- Dix returns the descriptor index (can be used for polling).
+   -- and writes 'Dix' wich is the descriptor index (can be used for polling).
+   -- this is an internal flag.
    --
    -- note that normally there should be no more than 1 item on the stack.
    -- so this command should happen after Stash_For_Sending without any
    -- ethernet send activity in between.
    -- the function returns false when 
    -- the next descriptor in the array is still in use. 
-   -- If this were to happen the eth net quality is most likely very poor, since
-   -- there are buffers waiting to be transmitted.
+   -- If this were to happen the eth net quality is most likely very poor, 
+   -- since there are buffers waiting to be transmitted.
    -- use Poll_Xmit_Completed after this command to ascertain its gone.
+   ---
+   -- can be posted in the job thread
+   
+   
+   procedure Poll_Xmit_Completed;
+   -- uses 'Dix', the index of the descriptor that was send.
+   -- once send the 'Dix_Done' flag is set (see Poll_R_Reply_Type for details)
+   -- since we have a strictly sequential comms pattern we check for
+   -- completed or error; in case of error normally there is a re-transmission 
+   -- after the error has been cleared.
+   ---
+   -- can be posted in the job thread
+   
    
    --procedure Mark_free (Idx : Buf_Idx_Type); -- wait a bit with this one
    -- return an eth buffer to the free list

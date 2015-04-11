@@ -50,8 +50,10 @@ package Finrod.Sermon with Elaborate_Body is
    -- (but this should not be needed)      --
    ------------------------------------------
    
-   Message_Length : constant Positive := 64;
-   -- incoming message size for uart 3.
+   Message_Length : constant Positive := 256;
+   -- incoming message size for uart 6.
+   -- check the use of this !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+   -- look like mix between xmit and recv
 
    type Uart_Data_Type is new String (1 .. Message_Length);
    subtype Srd_Index_Type is Integer range 1 .. Message_Length;

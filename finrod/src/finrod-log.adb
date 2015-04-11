@@ -152,10 +152,10 @@ package body Finrod.Log is
 	 if R_Indx /= Log_Index and 
 	   Logger (R_Indx).S (Logger (R_Indx).S'First) /= ASCII.NUL then
 	    Sermon.Send_String 
-	      (Timer.Image (Logger (R_Indx).Time_Stamp) & 
+	      (Timer.Image (Logger (R_Indx).Time_Stamp) & " -- " &
 		 Logger (R_Indx).S 
 		 (Logger (R_Indx).S'First .. Logger (R_Indx).Slast));
-	    R_Indx := R_Indx + 1; --  It Will Roll Over But Thats ok
+	    R_Indx := R_Indx - 1; --  It Will Roll Over But Thats ok
 	 else
 	    -- remove yourself
 	    Thread.Delete_Job (Try_Print_A_Record'Access);
@@ -169,7 +169,7 @@ package body Finrod.Log is
    procedure Print_Log
    is
    begin
-      R_Indx := Log_Index + 1;
+      R_Indx := Log_Index - 1;
       -- insert Try_Print_A_Record (must be more precise later)
       Thread.Insert_Job (Try_Print_A_Record'Access);
    end Print_Log;

@@ -54,6 +54,7 @@ package Finrod.Spy is
 				Spy_Try_Parse_Rsttimer,
 				Spy_Try_Parse_Rtime,
 				Spy_Try_Parse_Arp_Req,
+				Spy_Wait_Eth_Xmit_Complete,
 				Spy_Try_Parse_Show_Farp,
 				Spy_Echo_Junk,
 				Spy_Rebase_Incoming,

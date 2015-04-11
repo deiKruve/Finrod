@@ -51,7 +51,8 @@ package body Finrod.Net is
    function Poll_Received return Test_Reply_Type
    is 
    begin
-      case Eth.Rx_Poll is
+      Eth.Rx_Poll;
+      case Eth.Rx_Recvd is
 	 when No          =>
 	    return None_recd;--------------return
 	 when Error_Fatal =>
@@ -85,16 +86,22 @@ package body Finrod.Net is
 				 Time : out Timer.Time_type)
 				return Poll_X_Reply_Type
    is  
+      Dix_Tmp : constant Tx_Desc_Idx_Type := Eth.Dix;
    begin
-      case Eth.Poll_Xmit_Completed (Dix, Time) is-------------------------junk
+      Eth.Dix := Dix;
+      Eth.Poll_Xmit_Completed;
+      Eth.Dix := Dix_Tmp;
+      
+      case Eth.Dix_Done is
 	 when Ongoing          =>
 	    return Ongoing;
 	 when Complete         =>
+	    Time := Eth.Time;
 	    return Complete;
 	 when Error_Fatal      =>
 	    return Error_Fatal;
 	 when Error_Retry      =>
-	    null;
+	    null;----------------------------------what to do.
       end case;
       return Error_Fatal;
    end Poll_Xmit_Completed;
