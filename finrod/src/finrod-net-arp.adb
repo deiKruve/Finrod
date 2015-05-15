@@ -58,6 +58,8 @@ pragma Warnings (Off, "*(No_Exception_Propagation) in effect");
 pragma Warnings (Off, "*-fstrict-volatile-bitfields]");
 
 with System.Storage_Elements;
+--with System.Address_To_Access_Conversions;
+with Ada.Unchecked_Conversion;
 with Finrod.Board; 
 with Finrod.Net.Eth;
 with Finrod.Net.Arptable;
@@ -66,6 +68,7 @@ with Finrod.Sermon;
 package body Finrod.Net.Arp is
    
    package Sse       renames System.Storage_Elements;
+   --package Atoa      renames System.Address_To_Access_Conversions;
    package Board     renames Finrod.Board;
    package Arp_Table renames Finrod.Net.Arptable;
    package Eth       renames Finrod.Net.Eth;
@@ -294,38 +297,49 @@ package body Finrod.Net.Arp is
 			      Tpa : Stm.Bits_32       := Ip_Null)
 			     return Test_Reply_Type
    is
-      F : constant BArp_Packet_Access_Type := new BArp_Packet;
+      function Toba is new
+	Ada.Unchecked_Conversion (Source => System.Address,
+				  Target => BArp_Packet_Access_Type);
+      F   : BArp_Packet_Access_Type;
+      Idx : Eth.Buf_Idx_Type;
    begin
-      F.Dest  := Mac_Xmas;
-      F.Srce  := Board.Get_Mac_Address;
-      F.Proto := Arp_Proto;
-      F.Htype := Arp_Htype;
-      F.Ptype := Arp_Ptype;
-      F.Hlen  := Arp_Hlen;
-      F.Plen  := Arp_Plen;
-      F.Oper  := Arp_Req;
-      --F.Sha   := F.Srce;
-      --F.Spa   := Board.Get_Ip_Address;
-      F.Tha   := Mac_Null;
-      --F.Tpa   := Tpa;
-      case Req is
-	 when Arp_Request  =>
-	    F.Sha   := F.Srce;
-	    F.Spa   := Board.Get_Ip_Address;
-	    F.Tpa   := Tpa;
-	 when Arp_Probe    =>
-	    F.Sha := Mac_Null;
-	    F.Spa := Ip_Null;
-	    F.Tpa   := Tpa; -- see if our address is in use somewhere
-	 when Arp_Announce =>
-	    F.Spa   := Board.Get_Ip_Address;
-	    F.Sha   := F.Srce;
-	    F.Tpa   := F.Spa; -- to indicate an anouncement.
-	    --F.Tha := Mac_null;
-      end case;
-      Eth.Stash_For_Sending (F.all'Address , BArp_Packet_Length);
-      Show (F.all'Address);
-      return Stashed_For_Sending;
+      if not Eth.Find_Free (Idx) then
+	 -- do nothing, an error has been logged already
+	 return Fatal_Error;
+      else
+	 F       := Toba (Eth.Buf'Address); 
+	 -- the BArp_Packet's address is now the buffer address.
+	 F.Dest  := Mac_Xmas;
+	 F.Srce  := Board.Get_Mac_Address;
+	 F.Proto := Arp_Proto;
+	 F.Htype := Arp_Htype;
+	 F.Ptype := Arp_Ptype;
+	 F.Hlen  := Arp_Hlen;
+	 F.Plen  := Arp_Plen;
+	 F.Oper  := Arp_Req;
+	 --F.Sha   := F.Srce;
+	 --F.Spa   := Board.Get_Ip_Address;
+	 F.Tha   := Mac_Null;
+	 --F.Tpa   := Tpa;
+	 case Req is
+	    when Arp_Request  =>
+	       F.Sha   := F.Srce;
+	       F.Spa   := Board.Get_Ip_Address;
+	       F.Tpa   := Tpa;
+	    when Arp_Probe    =>
+	       F.Sha := Mac_Null;
+	       F.Spa := Ip_Null;
+	       F.Tpa   := Tpa; -- see if our address is in use somewhere
+	    when Arp_Announce =>
+	       F.Spa   := Board.Get_Ip_Address;
+	       F.Sha   := F.Srce;
+	       F.Tpa   := F.Spa; -- to indicate an anouncement.
+				 --F.Tha := Mac_null;
+	 end case;
+	 Eth.Stash_For_Sending (F.all'Address , BArp_Packet_Length);
+	 Show (F.all'Address);
+	 return Stashed_For_Sending;
+      end if;
    end Send_Arp_Request;
    
    

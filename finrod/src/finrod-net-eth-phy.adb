@@ -40,6 +40,7 @@ with STM32F4.o7xx.Registers;
 with Finrod.Board;
 with Finrod.Timer;
 with Finrod.Thread;
+with Finrod.Log;
 
 package body Finrod.Net.Eth.PHY is
    
@@ -85,6 +86,10 @@ package body Finrod.Net.Eth.PHY is
 
    
    -- PHY wite routine
+   --   pAddr - the board address of the phy
+   --   MReg  - the register number in the Phy
+   --   Clk   - the clock to use
+   --   Data  - data to write
    procedure Phy_Write (pAddr : Stm.Bits_5; 
 			MReg  : Stm.Bits_5; 
 			Clk   : Stm.Bits_3; 
@@ -140,6 +145,7 @@ package body Finrod.Net.Eth.PHY is
       case Fsm_State is
 	 when Phy_Idle        =>
 	    null;
+	    
 	 when Phy_Reset   =>
 	    if Phy_Available then
 	       -- reset to the phy
@@ -150,37 +156,77 @@ package body Finrod.Net.Eth.PHY is
 	       Timer.Start_Timer1 (0, 500_000_000);
 	       Fsm_State := Phy_Wait1;
 	    end if;
+	    
 	 when Phy_Wait1    =>
 	    if Phy_Available and Timer.Done1 then
 	       Fsm_State := Phy_Init1;
 	    end if;
+	    
 	 when Phy_Init1    =>
 	    Phy_Write (PAddr => Phy_Addr,
 		       MReg  => 0,
 		       Clk   => Phy_Mspeed,
-		       Data  => 2#0010_0000_1000_0000#); -- 100M
-							 -- enable COL test
+		       Data  => 2#0010_0000_0000_0000#);--------------
+	    --Data  => 2#0010_0000_1000_0000#); -- 100M
+	    -- enable COL test
+	    
 	    Fsm_State := Phy_Init2;
+	    
 	 when Phy_Init2    =>
 	    -- set interrupt sources mask
 	    if Phy_Available then
 	       Phy_Write (PAddr => Phy_Addr,
 			  MReg  => 30,
 			  Clk   => Phy_Mspeed,
-			  Data  => 2#0000_0000_0011_0000#); -- Remote Fault Detected
-							    -- Link Down 
-	       Fsm_State := Phy_wait2;
+			  Data  => 2#0000_0000_0000_0000#);
+	       -- Data  => 2#0000_0000_0011_0000#); 
+	       -- Remote Fault Detected
+	       -- Link Down 
+	       
+	       Fsm_State := Phy_Powerdown;
 	    end if;
-	 when Phy_Ask_Error =>
+	    
+	 when Phy_Powerdown  =>
 	    if Phy_Available then
-	       Phy_Read_Prep (pAddr => Phy_Addr,
-			      MReg  => 29,
-			      Clk   => Phy_Mspeed);
-	       Fsm_State := Phy_wait2;
+	       Phy_Write (PAddr => Phy_Addr,
+		       MReg  => 0,
+		       Clk   => Phy_Mspeed,
+		       Data  => 2#0010_1000_0000_0000#);-------------
+							-- 100M
+							-- powerdown
+	       Fsm_State := Phy_Wait2;
 	    end if;
+	    
+	 when Phy_Powerup   =>
+	    Phy_Write (PAddr => Phy_Addr,
+		       MReg  => 0,
+		       Clk   => Phy_Mspeed,
+		       Data  => 2#0010_0000_0000_0000#);--------------
+							-- 100M
+	    Fsm_State := Phy_Wait2;
+	    
 	 when Phy_Wait2     =>
 	    if Phy_Available then
 	       Thr.Delete_Job (Fsm'Access);
+	       Fsm_State := Phy_Ready;
+	    end if;
+		  
+	 when Phy_Ask_Error =>
+	    if Phy_Available then
+	       Phy_Read_Prep (pAddr => Phy_Addr,
+			      MReg  => 1, --29,
+			      Clk   => Phy_Mspeed);
+	       Fsm_State := Phy_wait3;
+	    end if;
+	 when Phy_Wait3     =>
+	    if Phy_Available then
+	       Thr.Delete_Job (Fsm'Access);
+	       declare
+		  Md : constant Stm.Bits_16 := R.Eth_Mac.MACMIIDR.Md;
+		  begin
+		     Log.Log_Error 
+		       (Log.Phy_Info, " Phy2 = " & Stm.Bits_16'Image (Md));
+		  end;
 	       Fsm_State := Phy_Ready;
 	    end if;
 	 when Phy_Ready     =>
@@ -207,6 +253,15 @@ package body Finrod.Net.Eth.PHY is
    end Reset;
    
    
+   -- wake up the phy after beauty sleep before work
+   procedure Power_Up
+   is
+   begin
+      Fsm_State := Phy_Powerup;
+      Thr.Insert_Job (Fsm'Access);
+   end Power_Up;
+   
+   
    -- asks the PHY to reveal its status.
    -- After 'State' returns 'Phy_Ready' the error can be gotten with 
    -- 'Which_Error'
@@ -224,11 +279,16 @@ package body Finrod.Net.Eth.PHY is
       use type Stm.Bits_16;
       Md : constant Stm.Bits_16 := R.Eth_Mac.MACMIIDR.Md;
    begin
-      If (MD and 2#0000_0000_0010_0000#) /= 0  then
-	 return Remote_Fault_Detected;
-      elsif (MD and 2#0000_0000_0001_0000#) /= 0 then
+      --  If (MD and 2#0000_0000_0010_0000#) /= 0  then
+      --  	 return Remote_Fault_Detected;
+      --  elsif (MD and 2#0000_0000_0001_0000#) /= 0 then
+      --  	 return Link_Down;
+      --  else return No_Error;
+      --  end if;
+      If (MD and 2#0000_0000_0000_0100#) /= 1  then
 	 return Link_Down;
-      else return No_Error;
+      else
+	 return No_Error;
       end if;
    end Which_Error;
       

@@ -33,16 +33,18 @@
 --
 --
 -- commands so far:
---  rsttimer                : reset the timer min and max registers
---                            the prob points must be inserted manually in the code 
---  rtime                   : report the min and max cycletime collected since reset
---  xarpreq                 : make an arp request 
---                        (the request is for the Master_Ip_adrress in Finrod.Board)
---  xarpprob                : do an arp probe
---  xarpann                 : make an arp announcement
+--  rsttimer           : reset the timer min and max registers
+--                        the prob points must be inserted manually in the code 
+--  rtime              : report the min and max cycletime collected since reset
+--  statphy            : log the status of the Phy (register 1). 
+--                        to be read out with lslog
+--  xarpreq            : make an arp request 
+--                   (the request is for the Master_Ip_adrress in Finrod.Board)
+--  xarpprob           : do an arp probe
+--  xarpann            : make an arp announcement
 --  lsrarp <number 1 .. 9>  : display 'number' received frames
 --  lsxarp <number 1 .. 9>  : display 'number' transmitted frames
---  lslog                   : displays the log
+--  lslog              : displays the log
 --
 
 package Finrod.Spy is
@@ -50,12 +52,12 @@ package Finrod.Spy is
    type State_Selector_Type is (Spy_Health_Check,
 				Spy_Is_Receiver_Full,
 				Spy_Wait_For_Receiver_Empty,
-				Spy_Try_Parse_Lslog,
+				Spy_Try_Parse_Ls,
 				Spy_Try_Parse_Rsttimer,
 				Spy_Try_Parse_Rtime,
+				Spy_Try_Parse_Status,
 				Spy_Try_Parse_Arp_Req,
 				Spy_Wait_Eth_Xmit_Complete,
-				Spy_Try_Parse_Show_Farp,
 				Spy_Echo_Junk,
 				Spy_Rebase_Incoming,
 				Idle);

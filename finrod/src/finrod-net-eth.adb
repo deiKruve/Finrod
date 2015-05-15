@@ -35,7 +35,6 @@ pragma Warnings (Off, "*may call Last_Chance_Handler");
 pragma Warnings (Off, "*(No_Exception_Propagation) in effect");
 pragma Warnings (Off, "*is not referenced");
 
-with System.Storage_Elements;
 with Ada.Unchecked_Conversion;
 with Interfaces;
 
@@ -67,8 +66,8 @@ package body Finrod.Net.Eth is
    -- the frame buffers --
    
    -- four, they are unisex, can be used for xmit and recv
-   type Buf_Idx_Type is mod 4;
-   Buf : array (Buf_Idx_Type) of Sto.Storage_Array (1 .. 1024);
+   -- type Buf_Idx_Type is mod 4; -- in the ads now
+   --Buf : array (Buf_Idx_Type) of Sto.Storage_Array (1 .. 1024);
    
    type Frame_Store_Type;
    type Frame_Store_P_Type is access all Frame_Store_Type;
@@ -162,7 +161,7 @@ package body Finrod.Net.Eth is
 	 Fs.Free := False;
 	 
       else
-	 Log.Log_Error (Log.Eth_Error_Buffers, "buffer not found.");
+	 Log.Log_Error (Log.Eth_Error_Buffers, "eth buffer(Idx) not found.");
       end if;
    end Mark_Used;
    
@@ -180,7 +179,7 @@ package body Finrod.Net.Eth is
 	 Fs.Free := False;
 	 
       else
-	 Log.Log_Error (Log.Eth_Error_Buffers, "buffer not found.");
+	 Log.Log_Error (Log.Eth_Error_Buffers, "eth buffer(Addr) not found.");
       end if;
    end Mark_Used;
    
@@ -262,6 +261,10 @@ package body Finrod.Net.Eth is
       end if;
    end Find_Free;
    
+   
+   -------------------
+   -- init routines
+   -------------------
 
    procedure Init_buffers
    is
@@ -313,7 +316,7 @@ package body Finrod.Net.Eth is
       Tx_Desc (0).Tdes0.Ttse  := Ebuf.Enable; -- timestamp enable
       Tx_Desc (0).Tdes0.Cic   := Ebuf.Ck_Head_Payload; -- checksum
       Tx_Desc (0).Tdes0.Ter   := Ebuf.Off;
-      Tx_Desc (0).Tdes0.Thc   := Ebuf.Tru;
+      Tx_Desc (0).Tdes0.Tch   := Ebuf.Tru;
       
       Tx_Desc (0).Tdes1.Tbs2  := 0; -- second buffer size
       Tx_Desc (0).Tdes1.Tbs1  := 0; --1024; -- to be set by appl
@@ -331,7 +334,7 @@ package body Finrod.Net.Eth is
       Tx_Desc (1).Tdes0.Ttse  := Ebuf.Enable; -- timestamp enable
       Tx_Desc (1).Tdes0.Cic   := Ebuf.Ck_Head_Payload; -- checksum
       Tx_Desc (1).Tdes0.Ter   := Ebuf.Off;
-      Tx_Desc (1).Tdes0.Thc   := Ebuf.Tru;
+      Tx_Desc (1).Tdes0.Tch   := Ebuf.Tru;
       
       Tx_Desc (1).Tdes1.Tbs2  := 0; -- second buffer size
       Tx_Desc (1).Tdes1.Tbs1  := 0; --1024; -- to be set by appl
@@ -349,7 +352,7 @@ package body Finrod.Net.Eth is
       Tx_Desc (2).Tdes0.Ttse  := Ebuf.Enable; -- timestamp enable
       Tx_Desc (2).Tdes0.Cic   := Ebuf.Ck_Head_Payload; -- checksum
       Tx_Desc (2).Tdes0.Ter   := Ebuf.Tru;
-      Tx_Desc (2).Tdes0.Thc   := Ebuf.Tru;
+      Tx_Desc (2).Tdes0.Tch   := Ebuf.Tru;
       
       Tx_Desc (2).Tdes1.Tbs2  := 0; -- second buffer size
       Tx_Desc (2).Tdes1.Tbs1  := 0; --1024; -- to be set by appl
@@ -364,7 +367,9 @@ package body Finrod.Net.Eth is
    -- sets first descriptor addresses
    procedure Set_Dma_Busmode
    is
+      use type Stm.Bits_1;
       DMABMR_Tmp : Eth.DMABMR_Register := R.Eth_Mac.DMABMR;
+      Dmaomr_Tmp : Eth.DMAOMR_Register := R.Eth_Mac.Dmaomr;
    begin
       DMABMR_Tmp.USP  := Eth.On;        -- Use separate PBL (could be at the moment)
       DMABMR_Tmp.RDP  := Eth.RDP_2Beat; -- maximum number of beats (RxDMA)
@@ -379,6 +384,13 @@ package body Finrod.Net.Eth is
       -- first descriptor addresses 
       R.Eth_Mac.DMARDLAR := Tob (Rx_Desc (Rx_Desc_Idx)'Address); 
       R.Eth_Mac.DMATDLAR := Tob (Tx_Desc (Tx_Desc_Idx)'Address);
+      
+      -- flush the transmitter
+      Dmaomr_Tmp.FTF := Eth.Flush;
+      R.Eth_Mac.Dmaomr := Dmaomr_Tmp;
+      while Dmaomr_Tmp.FTF /= Eth.Off loop
+	 Dmaomr_Tmp := R.Eth_Mac.Dmaomr;
+      end loop;
    end Set_Dma_Busmode;
    
    
@@ -445,13 +457,14 @@ package body Finrod.Net.Eth is
       MACCR_Tmp.Wd    := Eth.WD_On; -- according to cube (2048 bytes max)
       MACCR_Tmp.JD    := Eth.Jt_On; -- according to cube (2048 bytes max)
       MACCR_Tmp.IFG   := Eth.IFG_96Bit;
-      MACCR_Tmp.CSD   := Eth.Cs_On; -- cube but -- check for RMII --------
+      MACCR_Tmp.CSD   := Eth.Cs_disable;--on; -- cube but -- check for RMII --------
       MACCR_Tmp.FES   := Eth.Mb_100;
-      MACCR_Tmp.ROD   := Eth.Off;   -- enabled, acc to cube
+      MACCR_Tmp.ROD   := Eth.Ro_Disable;--Off;   -- enabled, acc to cube
       MACCR_Tmp.LM    := Eth.Off;   -- loopback off
       MACCR_Tmp.DM    := Eth.Off;   -- duplex mode off
       MACCR_Tmp.IPCO  := Eth.Enabled; -- ip checksum offload on
-      MACCR_Tmp.RD    := Eth.Retr_Disabled; -- gives an error after 1 collision
+				      --MACCR_Tmp.RD    := Eth.Retr_Disabled; -- gives an error after 1 collision
+      MACCR_Tmp.RD    := Eth.Off; -- for the time being
 					    -- this when working, and when starting up????----------------------
       MACCR_Tmp.APCS  := Eth.On;    -- Automatic Pad/CRC stripping
       MACCR_Tmp.Bl    := Eth.BL_10; -- back off time when collision.
@@ -465,11 +478,15 @@ package body Finrod.Net.Eth is
    -- and here comes die ganze Zirkuskraft.
    procedure Starting with inline
    is
-      MACCR_Tmp : Eth.MACCR_Register := R.Eth_Mac.MACCR;
+      MACCR_Tmp  : Eth.MACCR_Register  := R.Eth_Mac.MACCR;
+      Dmaomr_Tmp : Eth.DMAOMR_Register := R.Eth_Mac.Dmaomr;
    begin
-      MACCR_Tmp.Te    := Eth.On;
-      MACCR_Tmp.Re    := Eth.On;
-      R.Eth_Mac.MACCR := MACCR_Tmp;
+      MACCR_Tmp.Te     := Eth.On;
+      MACCR_Tmp.Re     := Eth.On;
+      R.Eth_Mac.MACCR  := MACCR_Tmp;
+      
+      Dmaomr_Tmp.ST    := Eth.Start;
+      R.Eth_Mac.Dmaomr := Dmaomr_Tmp;
    end Starting;
    
    
@@ -501,6 +518,7 @@ package body Finrod.Net.Eth is
    function Tx_Status_Image return String
    is (" DMAsr = " & Stm.Bits_32'Image (Error_Dmasr) & 
 	 " Tdes0 = " & Stm.Bits_32'Image (Error_Tdes0));
+   -- this what i saw so far:
    -- Tdes0.ec trips when no cable (too many collisions)
    --
    -- DMAsr.tps = 6 Suspended; 
@@ -521,6 +539,7 @@ package body Finrod.Net.Eth is
    procedure Rx_Poll
    is
       use type Stm.Bits_1;
+      use type Stm.Bits_3;
       function Des0Tob is new
 	Ada.Unchecked_Conversion (Source => Ebuf.Rdes0_Type,
 				  Target => Stm.Bits_32);
@@ -529,7 +548,8 @@ package body Finrod.Net.Eth is
 				  Target => Stm.Bits_32);
       Dmasr_Tmp : constant Eth.DMASR_Register := R.Eth_Mac.DMASR;
    begin
-      if Dmasr_Tmp.Ais = Eth.Tripped then
+      if Dmasr_Tmp.Ais = Eth.Tripped or 
+	Dmasr_Tmp.Tps  = Eth.TPS_Stopped then
 	 Error_Dmasr  := DmasrTob (Dmasr_Tmp); -- for later analysis
 	 Log.Log_Error (Log.Eth_Error_Rcve, DMA_Status_Image);
 	 Rx_Recvd     := Error_Fatal; -- until we know better.
@@ -580,27 +600,49 @@ package body Finrod.Net.Eth is
 			Bbc : in Frame_Length_Type)
    is
       use type Stm.Bits_1;
+      use type Stm.Bits_3;
+      function DmasrTob is new
+	Ada.Unchecked_Conversion (Source => Eth.DMASR_Register,
+				  Target => Stm.Bits_32);
       Tdes0_Tmp : Ebuf.Tdes0_Type := Tx_Desc (Tx_Desc_Idx).Tdes0;
    begin
       if Tdes0_Tmp.Own = Ebuf.Me then
-	 Tdes0_Tmp.Ls                      := Ebuf.Tru; --!!!!!!!
-	 Tdes0_Tmp.Fs                      := Ebuf.Tru; --!!!!!!!
+	 Tdes0_Tmp.Ls                      := Ebuf.Tru;
+	 Tdes0_Tmp.Fs                      := Ebuf.Tru;
 	 Tdes0_Tmp.Ttse                    := Ebuf.Enable; -- timestamp enable
 	 Tdes0_Tmp.Cic                     := Ebuf.Ck_Head_Payload; -- checksum
+	 Tdes0_Tmp.Tch                     := Ebuf.Tru;
 	 Tx_Desc (Tx_Desc_Idx).Tdes0       := Tdes0_Tmp;
 	 Tx_Desc (Tx_Desc_Idx).Tdes1.Tbs1  := Bbc;
 	 Tx_Desc (Tx_Desc_Idx).Tdes2.Tbap1_Ttsl  := Tob (Ba);
+	 Dix_Buf                           := Ba;
 	 Tdes0_Tmp.Own                     := Ebuf.Dma; -- control to DMA
 	 Tx_Desc (Tx_Desc_Idx).Tdes0       := Tdes0_Tmp;
 	 
 	 -- and start transmission
-	 R.Eth_Mac.DMATDLAR := Tob (Tx_Desc (Tx_Desc_Idx)'Address);
 	 declare 
-	    Dmaomr_Tmp : Eth.DMAOMR_Register := R.Eth_Mac.Dmaomr;
+	    Dmasr_Tmp : constant Eth.DMASR_Register := R.Eth_Mac.DMASR;
 	 begin
-	    Dmaomr_Tmp.ST    := Eth.Start;
-	    R.Eth_Mac.Dmaomr := Dmaomr_Tmp;
+	    if Dmasr_Tmp.Tps        = Eth.TPS_Suspended then
+	       R.Eth_Mac.DMASR      := Dmasr_Tmp;
+	       R.Eth_Mac.DMATPDR    := 1; -- any value is ok
+	    elsif Dmasr_Tmp.Tps     = Eth.TPS_Stopped then
+	       Error_Dmasr          := DmasrTob (Dmasr_Tmp);
+	       Log.Log_Error 
+		 (Log.Eth_Error_Xmit, "Ethernet stopped");
+	       Dix_Done             := Error_Fatal;
+	       return;
+	    end if;
 	 end;
+	 
+	 --  R.Eth_Mac.DMATDLAR := Tob (Tx_Desc (Tx_Desc_Idx)'Address);
+	 --  declare 
+	 --     Dmaomr_Tmp : Eth.DMAOMR_Register := R.Eth_Mac.Dmaomr;
+	 --  begin
+	 --     Dmaomr_Tmp.ST    := Eth.Start;
+	 --     R.Eth_Mac.Dmaomr := Dmaomr_Tmp;
+	 --  end;
+	 
 	 Dix             := Tx_Desc_Idx;       -- for return to app for polling
 	 Tx_Desc_Idx     := Tx_Desc_Idx + 1;   -- assume it is empty
 	 
@@ -666,22 +708,42 @@ package body Finrod.Net.Eth is
    procedure Send_Next
    is
       use type Stm.Bits_1;
+      use type Stm.Bits_3;
       Stash : constant Stashed_P_Type    := Stash_Root;
       St    : Stashed_P_Type;
    begin
       if Tx_Desc (Tx_Desc_Idx).Tdes0.Own = Ebuf.Me then
 	 Tx_Desc (Tx_Desc_Idx).Tdes1.Tbs1       := Stash.Frame_Len;
 	 Tx_Desc (Tx_Desc_Idx).Tdes2.Tbap1_Ttsl := Tob (Stash.Frame_Addr);
+	 Dix_Buf                                := Stash.Frame_Addr;
 	 Tx_Desc (Tx_Desc_Idx).Tdes0.Own        := Ebuf.Dma; -- control to DMA
 	 
 	 -- and start transmission
-	 R.Eth_Mac.DMATDLAR  := Tob (Tx_Desc (Tx_Desc_Idx)'Address);
 	 declare 
-	    Dmaomr_Tmp : Eth.DMAOMR_Register := R.Eth_Mac.Dmaomr;
+	    function DmasrTob is new
+	      Ada.Unchecked_Conversion (Source => Eth.DMASR_Register,
+					Target => Stm.Bits_32);
+	    Dmasr_Tmp : constant Eth.DMASR_Register := R.Eth_Mac.DMASR;
 	 begin
-	    Dmaomr_Tmp.ST    := Eth.Start;
-	    R.Eth_Mac.Dmaomr := Dmaomr_Tmp;
+	    if Dmasr_Tmp.Tps        = Eth.TPS_Suspended then
+	       R.Eth_Mac.DMASR      := Dmasr_Tmp;
+	       R.Eth_Mac.DMATPDR    := 1; -- any value is ok
+	    elsif Dmasr_Tmp.Tps     = Eth.TPS_Stopped then
+	       Error_Dmasr          := DmasrTob (Dmasr_Tmp);
+	       Log.Log_Error 
+		 (Log.Eth_Error_Xmit, "Ethernet stopped");
+	       Dix_Done             := Error_Fatal;
+	       return;
+	    end if;
 	 end;
+	 
+	 --  R.Eth_Mac.DMATDLAR  := Tob (Tx_Desc (Tx_Desc_Idx)'Address);
+	 --  declare 
+	 --     Dmaomr_Tmp : Eth.DMAOMR_Register := R.Eth_Mac.Dmaomr;
+	 --  begin
+	 --     Dmaomr_Tmp.ST    := Eth.Start;
+	 --     R.Eth_Mac.Dmaomr := Dmaomr_Tmp;
+	 --  end;
 	 
 	 if Stash_Root = Stash then
 	    St              := Stash_Root;         -- out of the chain and
@@ -717,6 +779,7 @@ package body Finrod.Net.Eth is
    procedure Poll_Xmit_Completed
    is
       use type Stm.Bits_1;
+      use type Stm.Bits_3;
       function Des0Tob is new
 	Ada.Unchecked_Conversion (Source => Ebuf.Tdes0_Type,
 				  Target => Stm.Bits_32);
@@ -726,7 +789,9 @@ package body Finrod.Net.Eth is
       Tdes0_Tmp : constant Ebuf.Tdes0_Type    := Tx_Desc (Dix).Tdes0;
       Dmasr_Tmp : constant Eth.DMASR_Register := R.Eth_Mac.DMASR;
    begin
-      if Dmasr_Tmp.Ais = Eth.Tripped or Tdes0_Tmp.Es = Ebuf.Tripped then
+      if Dmasr_Tmp.Ais = Eth.Tripped or Dmasr_Tmp.Tps = Eth.TPS_Stopped or
+	Tdes0_Tmp.Es = Ebuf.Tripped then
+	 -- error condition
 	 Error_Dmasr  := DmasrTob (Dmasr_Tmp); -- for later analysis
 	 Error_Tdes0  := des0tob (Tdes0_Tmp);
 	 Log.Log_Error (Log.Eth_Error_Xmit, Tx_Status_Image);
@@ -747,7 +812,7 @@ package body Finrod.Net.Eth is
 	 end;
 	 Dix_Done := Complete;
 	 -- return the buffer for reuse
-	 Mark_Free (Toa (Tx_Desc (Dix).Tdes3.Tbap2_Ttsh));
+	 Mark_Free (Dix_Buf);
 	 -- remove yrself here
 	 Thr.Delete_Job (Poll_Xmit_Completed'Access);
       end if;
@@ -906,3 +971,30 @@ package body Finrod.Net.Eth is
    
 
 end Finrod.Net.Eth;
+
+
+-- TO TEST:
+-- on the laptop:
+
+-- su
+-- ifdown eth0
+-- change cable
+--
+-- ethtool -s eth0 speed 100 duplex half autoneg off
+-- ifconfig eth0 promisc 192.168.1.5
+-- ipgrab -m -i eth0 (to listen for packets)
+
+-- control-C ipgrab
+-- ifconfig eth0 down (to switch off again)
+-- cable out
+-- ifconfig eth0 -promisc
+-- ethtool -s eth0 speed 100 duplex full autoneg on
+-- cable in
+-- ifup eth0
+--
+--
+-- dmesg | grep eth   shows status changes on the interfaces
+--
+--
+-- the first packet received:
+-- 16 Mon May  4 17:52:39 2015 | ETH 02:00:00:00:01:00->ff:ff:ff:ff:ff:ff | ARP request 16.0.1.0

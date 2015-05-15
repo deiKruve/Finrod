@@ -40,7 +40,7 @@ with Finrod.Board;
 with Finrod.Sermon;
 with Finrod.Thread;
 with Finrod.Timer;
-with Finrod.Net.Eth;
+with Finrod.Net.Eth.Phy;
 with Finrod.Net.Arp;
 with Finrod.Log;
 with Finrod.Last_Chance_Handler;
@@ -54,6 +54,7 @@ package body Finrod.Spy is
    package Timer renames Finrod.Timer;
    package Net   renames Finrod.Net;
    package Eth   renames Finrod.Net.Eth;
+   package Phy   renames Finrod.Net.Eth.Phy;
    package Arp   renames Finrod.Net.Arp;
    package Log   renames Finrod.Log;
    
@@ -115,14 +116,47 @@ package body Finrod.Spy is
 	    
 	 when Spy_Wait_For_Receiver_Empty =>
 	    if V24.Transmitter_Is_Empty then
-	       Fsm_State := Spy_Try_Parse_Lslog;
+	       Fsm_State := Spy_Try_Parse_Ls;
 	    end if;
 	    
-	 when Spy_Try_Parse_Lslog         =>
-	    if V24.Serial_Recd_Data_A.all (First .. First + 4) = 
-	      "lslog" then
-	       Log.Print_Log;
-	       Fsm_State := Spy_Rebase_Incoming;
+	 when Spy_Try_Parse_Ls            =>
+	    -- lslog, lsrarp, lsxarp
+	    if V24.Serial_Recd_Data_A.all (First .. First + 1) = 
+	      "ls" then
+	       if V24.Serial_Recd_Data_A.all (First + 2 .. First + 4) =
+		 "log" then
+		  Log.Print_Log;
+		  Fsm_State := Spy_Rebase_Incoming;
+	       elsif V24.Serial_Recd_Data_A.all (First + 2 .. First + 5) =
+		 "rarp" then
+		  declare 
+		     I : Integer := First + 6;
+		     J : Natural range 0 .. 9;
+		  begin
+		     while V24.Serial_Recd_Data_A.all (I) = ' ' loop
+			I := I + 1;
+		     end loop;
+		     J := Positive'Value 
+		       (String (V24.Serial_Recd_Data_A.all (I .. I)));
+		     if J /= 0 then Arp.Display_Received (J); end if;
+		  end;
+		  Fsm_State := Spy_Rebase_Incoming;
+	       elsif V24.Serial_Recd_Data_A.all (First + 2 .. First + 5) = 
+		 "xarp" then
+		  declare 
+		     I : Integer := First + 6;
+		     J : Natural range 0 .. 9;
+		  begin
+		     while V24.Serial_Recd_Data_A.all (I) = ' ' loop
+			I := I + 1;
+		     end loop;
+		     J := Positive'Value 
+		       (String (V24.Serial_Recd_Data_A.all (I .. I)));
+		     if J /= 0 then Arp.Display_Xmitted (J); end if;
+		  end;
+		  Fsm_State := Spy_Rebase_Incoming;
+	       else Fsm_State := Spy_Echo_Junk;
+	       end if;
 	    else Fsm_State := Spy_Try_Parse_Rsttimer;
 	    end if;
 	    
@@ -143,10 +177,26 @@ package body Finrod.Spy is
 		    Timer.Image (Timer.Report_Max_Duration) &
 		    " max.");
 	       Fsm_State := Spy_Rebase_Incoming;
-	    else Fsm_State := Spy_Try_Parse_Arp_Req;
+	    else Fsm_State := Spy_Try_Parse_Status;
+	    end if;
+	    
+	 when Spy_Try_Parse_Status    =>
+	    -- statphy
+	    if V24.Serial_Recd_Data_A.all (First .. First + 3) = 
+	      "stat" then
+	       if V24.Serial_Recd_Data_A.all (First + 4 .. First + 6) = 
+		 "phy" then
+		  Phy.Ask_Error; -- log the status register of the phy
+		  Fsm_State := Spy_Rebase_Incoming;
+	       else 
+		  Fsm_State := Spy_Echo_Junk;
+	       end if;
+	    else
+	       Fsm_State := Spy_Try_Parse_Arp_Req;
 	    end if;
 	    
 	 when Spy_Try_Parse_Arp_Req       =>
+	    -- xarpreq, xarpprob, xarpann
 	    if V24.Serial_Recd_Data_A.all (First .. First + 3) = 
 	      "xarp" then
 	       if V24.Serial_Recd_Data_A.all (First + 4 .. First + 6) = 
@@ -173,7 +223,7 @@ package body Finrod.Spy is
 		  Fsm_State := Spy_Echo_Junk;
 	       end if;
 	    else
-	       Fsm_State := Spy_Echo_Junk;
+	       Fsm_State := Spy_Echo_Junk; -- last one in the parse chain
 	    end if;
 	    
 	 when Spy_Wait_Eth_Xmit_Complete =>
@@ -183,38 +233,6 @@ package body Finrod.Spy is
 	       -- throw the error for the moment
 	       -- it will be picked up in the log checker.
 	       Fsm_State := Spy_Rebase_Incoming;
-	    end if;
-	    
-	 when Spy_Try_Parse_Show_Farp     =>
-	    if V24.Serial_Recd_Data_A.all (First .. First + 5) = 
-	      "lsrarp" then
-	       declare 
-		  I : Integer := First + 6;
-		  J : Natural range 0 .. 9;
-	       begin
-		  while V24.Serial_Recd_Data_A.all (I) = ' ' loop
-		     I := I + 1;
-		  end loop;
-		  J := Positive'Value 
-		    (String (V24.Serial_Recd_Data_A.all (I .. I)));
-		  if J /= 0 then Arp.Display_Received (J); end if;
-	       end;
-	       Fsm_State := Spy_Rebase_Incoming;
-	    elsif V24.Serial_Recd_Data_A.all (First .. First + 5) = 
-	      "lsxarp" then
-	       declare 
-		  I : Integer := First + 6;
-		  J : Natural range 0 .. 9;
-	       begin
-		  while V24.Serial_Recd_Data_A.all (I) = ' ' loop
-		     I := I + 1;
-		  end loop;
-		  J := Positive'Value 
-		    (String (V24.Serial_Recd_Data_A.all (I .. I)));
-		  if J /= 0 then Arp.Display_Xmitted (J); end if;
-	       end;
-	       Fsm_State := Spy_Rebase_Incoming;
-	    else Fsm_State := Spy_Echo_Junk;
 	    end if;
 
 	 when Spy_Echo_Junk               =>

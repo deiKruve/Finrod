@@ -143,15 +143,18 @@ package body Finrod.Nmt is
 	       Thr.Scan;
 	       if PHY.State = PHY.Phy_Ready and 
 		 Eth.State = Eth.Eth_Ready_To_Start then
+		  Phy.Power_Up;
+		  Eth.Start_Receive_DMA; -- so the receiver is now operational
 		  Finrod.Net.Eth.Eth_Start; -- enable the xmitter and receiver
 		  Fsm_State := Nmt_Wait_Communication_Ok;
 	       end if;
 	       Thr.Scan;
 	       
 	    when Nmt_Wait_Communication_Ok      =>
-	       if Eth.State = Eth.Eth_Ready then
+	       if Eth.State = Eth.Eth_Ready and then 
+		 PHY.State = PHY.Phy_Ready then
 		  Log.Log ("communication ok now.");
-		  Eth.Start_Receive_DMA; -- so the receiver is now operational
+		  --Eth.Start_Receive_DMA; -- so the receiver is now operational
 		  Fsm_State := Nmt_Reset_Configuration;
 	       end if;
 	       Thr.Scan;

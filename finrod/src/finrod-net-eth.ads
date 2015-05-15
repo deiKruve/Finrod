@@ -33,6 +33,7 @@
 
 --with System;
 --with STM32F4;
+with System.Storage_Elements;
 with Finrod.Timer;
 
 package Finrod.Net.Eth is
@@ -52,13 +53,35 @@ package Finrod.Net.Eth is
    --type Tx_Desc_Idx_Type is mod 3;
    -- moved up one level
    
-   ----------------------
-   -- public interface --
-   ----------------------
    
    Recvd_Frame_P : Frame_Address_Type; 
    Recvd_Frame_L : Frame_Length_Type;
    -- address and length of the last received good frame.
+   
+   
+   -- the frame buffers --
+   -- they are unisex, can be used for xmit and recv
+   type Buf_Idx_Type is mod 4;
+   -- allow for 4 buffers;
+   type 
+   Buf_Type is array (Buf_Idx_Type) of 
+     System.Storage_Elements.Storage_Array (1 .. 1024);
+   Buf : aliased Buf_Type;
+   for Buf'Alignment use 4;
+   -- the buffer definition
+   
+   
+   ----------------------
+   -- public interface --
+   ----------------------
+   
+   function Find_Free ( Fa : out Frame_Address_Type) 
+		      return Boolean;
+   --  find a free buffer  --
+   
+   function Find_Free (Idx : out Buf_Idx_Type) 
+		      return Boolean;
+   --  find a free buffer  --
    
    procedure Start_Receive_DMA with Inline;
    -- starts the receiver DMA
@@ -101,10 +124,13 @@ package Finrod.Net.Eth is
    -- holds the xmit descriptor index of the last send frame 
    -- (can be used for polling).
    
+   Dix_Buf  : System.Address := System.Null_Address;
+   -- last send frame buffer   
+   
    Dix_Done : Poll_X_Reply_Type := Complete;
    -- the last frame was successfully send
    
-   Time      : Timer.Time_Type;
+   Time     : Timer.Time_Type;
    -- timestamp of the last xmitted frame
    -- for use in syncing
    

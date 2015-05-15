@@ -41,8 +41,11 @@ package Finrod.Net.Eth.PHY is
 				Phy_Wait1,
 				Phy_Init1,
 				Phy_Init2,
-				Phy_Ask_Error,
+				Phy_Powerdown,
+				Phy_Powerup,
 				Phy_Wait2,
+				Phy_Ask_Error,
+				Phy_Wait3,
 				Phy_Ready);
    
    type Error_Type is (No_Error,
@@ -59,6 +62,9 @@ package Finrod.Net.Eth.PHY is
    -- once finished the fsm will disappear from the jobstack and 
    -- the state selector will be at ready.
    
+   -- wake up the phy after beauty sleep before work
+   procedure Power_Up with inline;
+     
    function Phy_Interrupted return Boolean with Inline;
    -- poll the phy interrupt on GPIOA pin 3
    

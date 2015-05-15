@@ -86,6 +86,7 @@ package Finrod.Log is
 		       Eth_Error_Buffers,
 		       Eth_Error_Xmit,
 		       Eth_Error_Rcve,
+		       Phy_Info,
 		       Net_Error);
    -- the error type indicates the action to be taken.
    
