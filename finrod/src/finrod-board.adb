@@ -52,7 +52,8 @@ package body Finrod.Board is
    -- definitions and local vars --
    --------------------------------
    
-   My_Id : Board_Id;
+   My_Id   : Board_Id;
+   My_Type : Board_Type;
    
    
   -- inits the pins and then calls any other init functions --
@@ -361,6 +362,13 @@ package body Finrod.Board is
       end;
    end Init_Pins;
    
+   
+   function Get_Type return Board_Type
+   is
+   begin
+      return My_Type;
+   end Get_Type;
+   
   
   function Get_Id return Board_Id
   is
@@ -406,6 +414,13 @@ package body Finrod.Board is
   begin
      return PHY_MSpeed;
   end Get_PHY_Mspeed;
+  
+  
+  procedure Set_Type (Typ : Board_Type)
+  is
+  begin
+     My_Type := Typ;
+  end Set_Type;
      
   
   procedure Set_Id (Id : Board_Id)
@@ -413,13 +428,14 @@ package body Finrod.Board is
      use type Stm.Bits_16;
      use type Stm.Bits_32;
      use type Stm.Bits_48;
-     Tid : constant Stm.Bits_16 := Stm.Bits_16 (Id) * 16#100#;
+     --  Tid : constant Stm.Bits_16 := Stm.Bits_16 (Id) * 16#100#;
   begin
      My_Id := Id;
-     My_Mac_Address := 
-       (My_Mac_Address and 16#ff_ff_ff_ff_00_ff#) or Stm.Bits_48 (Tid);
-     My_Ip_Address  := 
-       (My_Ip_Address and 16#ff_ff_00_ff#) or Stm.Bits_32 (Tid);
+     -- the following is now done at hw_definition level:
+     --  My_Mac_Address := 
+     --    (My_Mac_Address and 16#ff_ff_ff_ff_00_ff#) or Stm.Bits_48 (Tid);
+     --  My_Ip_Address  := 
+     --    (My_Ip_Address and 16#ff_ff_00_ff#) or Stm.Bits_32 (Tid);
   end Set_Id;
   
   

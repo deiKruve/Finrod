@@ -28,6 +28,7 @@
 ------------------------------------------------------------------------------
 --
 -- this is the interface to the customer aplication
+-- superflous now, can be deleted. see sample-app
 
 
 package body Finrod.App is

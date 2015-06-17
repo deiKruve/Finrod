@@ -48,7 +48,8 @@ with STM32F4.o7xx.Eth;
 
 package Finrod.Board is
    
-   subtype Board_Id    is Natural;
+   subtype Board_Type  is STM32F4.Byte;
+   subtype Board_Id    is STM32F4.Byte;
    subtype Mac_Address is STM32F4.Bits_48;
    subtype Ip_Address  is STM32F4.Bits_32;
    
@@ -60,6 +61,10 @@ package Finrod.Board is
    -- inits the basic board with serial and eth comms and id pins
    -- it will call any other  resource init functions 
    -- that might be needed
+   
+   function Get_Type return Board_Type;
+   -- returns the board type
+   -- the type should match the software functions of the board.
    
    function Get_Id return Board_Id;
    -- returns the board id
@@ -87,19 +92,25 @@ package Finrod.Board is
    function Get_PHY_Mspeed return STM32F4.Bits_3 with Inline;
    --  returns the PHY service bus speed;
    
+   procedure Set_Type (Typ : Board_Type) with Inline;
+   -- sets the board type
+   
    procedure Set_Id (Id : Board_Id) with Inline;
+   -- new description is needed here
+   
    -- sets the board id and incorporates it into the net addresses
    -- as explained above.
    -- this should really be an internal procedure, but jus in case it is 
    -- declared here.
+   -- To be set by the application in Init at top level.
    
    procedure Set_Mac_Address (M : Mac_Address) with Inline;
    -- Sets the mac address of the stm board.
-   -- To be set by the application.
+   -- To be set by the application in Init at top level
    
    procedure Set_Ip_Address (Ip : Ip_Address) with Inline;
    -- Sets the ip address of the stm board.
-   -- To be set by the application.
+   -- To be set by the application in Init at top level.
    
    procedure Set_Master_Ip_Address (Ip : Ip_Address) with Inline;
    -- Sets the ip address of the bus masternode.
@@ -111,8 +122,8 @@ private
    My_Mac_Address       : Stm32F4.Bits_48  := 16#02_00_00_00_00_00#;
    My_Ip_Address        : Stm32F4.Bits_32  := 16#10_00_00_00#;
    -- the addresses of the board.
-   -- To be set by the application
-   -- by setting the board id it should happen automagically
+   -- To be set by the application, by transferring the value defined in
+   -- hw_def-b<x>.ads
    
    Master_Ip_Address : Stm32F4.Bits_32  := 16#10_00_01_00#;
    -- the Ip Address of the master node
